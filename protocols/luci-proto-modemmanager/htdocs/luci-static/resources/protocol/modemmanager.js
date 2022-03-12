@@ -1,26 +1,51 @@
 'use strict';
-'require rpc';
+'require fs';
 'require form';
 'require network';
 
-var callFileList = rpc.declare({
-	object: 'file',
-	method: 'list',
-	params: [ 'path' ],
-	expect: { entries: [] },
-	filter: function(list, params) {
-		var rv = [];
-		for (var i = 0; i < list.length; i++)
-			if (list[i].name.match(/^cdc-wdm/))
-				rv.push(params.path + list[i].name);
-		return rv.sort();
-	}
-});
+function getModemList() {
+	return fs.exec_direct('/usr/bin/mmcli', [ '-L' ]).then(function(res) {
+		var lines = (res || '').split(/\n/),
+		    tasks = [];
+
+		for (var i = 0; i < lines.length; i++) {
+			var m = lines[i].match(/\/Modem\/(\d+)/);
+			if (m)
+				tasks.push(fs.exec_direct('/usr/bin/mmcli', [ '-m', m[1] ]));
+		}
+
+		return Promise.all(tasks).then(function(res) {
+			var modems = [];
+
+			for (var i = 0; i < res.length; i++) {
+				var man = res[i].match(/manufacturer: ([^\n]+)/),
+				    mod = res[i].match(/model: ([^\n]+)/),
+				    dev = res[i].match(/device: ([^\n]+)/);
+
+				if (dev) {
+					modems.push({
+						device:       dev[1].trim(),
+						manufacturer: (man ? man[1].trim() : '') || '?',
+						model:        (mod ? mod[1].trim() : '') || dev[1].trim()
+					});
+				}
+			}
+
+			return modems;
+		});
+	});
+}
 
 network.registerPatternVirtual(/^mobiledata-.+$/);
-network.registerErrorCode('CALL_FAILED', _('Call failed'));
-network.registerErrorCode('NO_CID',      _('Unable to obtain client ID'));
-network.registerErrorCode('PLMN_FAILED', _('Setting PLMN failed'));
+network.registerErrorCode('MM_CONNECT_FAILED', _('Connection attempt failed.'));
+network.registerErrorCode('MM_DISCONNECT_IN_PROGRESS', _('Modem disconnection in progress. Please wait.'));
+network.registerErrorCode('MM_CONNECT_IN_PROGRESS', _('Modem connection in progress. Please wait. This process will timeout after 2 minutes.'));
+network.registerErrorCode('MM_TEARDOWN_IN_PROGRESS', _('Modem bearer teardown in progress.'));
+network.registerErrorCode('MM_MODEM_DISABLED', _('Modem is disabled.'));
+network.registerErrorCode('DEVICE_NOT_MANAGED', _('Device not managed by ModemManager.'));
+network.registerErrorCode('INVALID_BEARER_LIST', _('Invalid bearer list. Possibly too many bearers created.  This protocol supports one and only one bearer.'));
+network.registerErrorCode('UNKNOWN_METHOD', _('Unknown and unsupported connection method.'));
+network.registerErrorCode('DISCONNECT_FAILED', _('Disconnection attempt failed.'));
 
 return network.registerProtocol('modemmanager', {
 	getI18n: function() {
@@ -54,18 +79,31 @@ return network.registerProtocol('modemmanager', {
 	renderFormOptions: function(s) {
 		var dev = this.getL3Device() || this.getDevice(), o;
 
-		o = s.taboption('general', form.ListValue, 'device', _('Modem device'));
+		o = s.taboption('general', form.ListValue, '_modem_device', _('Modem device'));
+		o.ucioption = 'device';
 		o.rmempty = false;
 		o.load = function(section_id) {
-			return callFileList('/dev/').then(L.bind(function(devices) {
+			return getModemList().then(L.bind(function(devices) {
 				for (var i = 0; i < devices.length; i++)
-					this.value(devices[i]);
+					this.value(devices[i].device,
+						'%s - %s'.format(devices[i].manufacturer, devices[i].model));
 				return form.Value.prototype.load.apply(this, [section_id]);
 			}, this));
 		};
 
-		s.taboption('general', form.Value, 'apn', _('APN'));
-		s.taboption('general', form.Value, 'pincode', _('PIN'));
+		o = s.taboption('general', form.Value, 'apn', _('APN'));
+		o.validate = function(section_id, value) {
+			if (value == null || value == '')
+				return true;
+
+			if (!/^[a-zA-Z0-9\-.]*[a-zA-Z0-9]$/.test(value))
+				return _('Invalid APN provided');
+
+			return true;
+		};
+
+		o = s.taboption('general', form.Value, 'pincode', _('PIN'));
+		o.datatype = 'and(uinteger,minlength(4),maxlength(8))';
 
 		o = s.taboption('general', form.ListValue, 'auth', _('Authentication Type'));
 		o.value('both', _('PAP/CHAP (both)'));
@@ -94,8 +132,8 @@ return network.registerProtocol('modemmanager', {
 		o = s.taboption('advanced', form.Value, 'mtu', _('Override MTU'));
 		o.placeholder = dev ? (dev.getMTU() || '1500') : '1500';
 		o.datatype    = 'max(9200)';
-		
-		s.taboption('general', form.Value, 'metric', _('Gateway metric'));
 
+		o = s.taboption('general', form.Value, 'signalrate', _('Signal Refresh Rate'), _("In seconds"));
+		o.datatype = 'uinteger';
 	}
 });

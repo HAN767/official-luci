@@ -216,6 +216,9 @@ static bool parse_cidr(const char *dest, cidr_t *pp)
 		if (pp->scope == 0)
 			return false;
 	}
+	else {
+		pp->scope = 0;
+	}
 
 	if (p)
 	{
@@ -327,18 +330,21 @@ static void L_setaddr(struct lua_State *L, const char *name,
 		p->family = AF_INET;
 		p->bits = (bits < 0) ? AF_BITS(AF_INET) : bits;
 		p->addr.v4 = *(struct in_addr *)addr;
+		p->scope = 0;
 	}
 	else if (family == AF_INET6)
 	{
 		p->family = AF_INET6;
 		p->bits = (bits < 0) ? AF_BITS(AF_INET6) : bits;
 		p->addr.v6 = *(struct in6_addr *)addr;
+		p->scope = 0;
 	}
 	else
 	{
 		p->family = AF_PACKET;
 		p->bits = (bits < 0) ? AF_BITS(AF_PACKET) : bits;
 		p->addr.mac = *(struct ether_addr *)addr;
+		p->scope = 0;
 	}
 
 	luaL_getmetatable(L, LUCI_IP_CIDR);
@@ -741,6 +747,7 @@ static int cidr_mask(lua_State *L)
 	if (!(p2 = lua_newuserdata(L, sizeof(*p2))))
 		return 0;
 
+	p2->scope = 0;
 	p2->bits = AF_BITS(p1->family);
 	p2->family = p1->family;
 
@@ -784,6 +791,7 @@ static int cidr_mapped4(lua_State *L)
 	if (!(p2 = lua_newuserdata(L, sizeof(*p2))))
 		return 0;
 
+	p2->scope = 0;
 	p2->family = AF_INET;
 	p2->bits = (p1->bits > AF_BITS(AF_INET)) ? AF_BITS(AF_INET) : p1->bits;
 	memcpy(&p2->addr.v4, p1->addr.v6.s6_addr + 12, sizeof(p2->addr.v4));
@@ -824,10 +832,17 @@ static int cidr_tolinklocal(lua_State *L)
 	if (!(p2 = lua_newuserdata(L, sizeof(*p2))))
 		return 0;
 
+	p2->scope = p1->scope;
 	p2->family = AF_INET6;
 	p2->bits = AF_BITS(AF_INET6);
 	p2->addr.u8[0] = 0xFE;
 	p2->addr.u8[1] = 0x80;
+	p2->addr.u8[2] = 0x00;
+	p2->addr.u8[3] = 0x00;
+	p2->addr.u8[4] = 0x00;
+	p2->addr.u8[5] = 0x00;
+	p2->addr.u8[6] = 0x00;
+	p2->addr.u8[7] = 0x00;
 	p2->addr.u8[8] = p1->addr.u8[0] ^ 0x02;
 	p2->addr.u8[9] = p1->addr.u8[1];
 	p2->addr.u8[10] = p1->addr.u8[2];
@@ -864,6 +879,7 @@ static int cidr_tomac(lua_State *L)
 	if (!(p2 = lua_newuserdata(L, sizeof(*p2))))
 		return 0;
 
+	p2->scope = 0;
 	p2->family = AF_PACKET;
 	p2->bits = AF_BITS(AF_PACKET);
 	p2->addr.u8[0] = p1->addr.u8[8] ^ 0x02;

@@ -35,8 +35,8 @@
 	</div>
 
 	<div class="cbi-page-actions">
-		<input type="submit" value="<%:Login%>" class="cbi-button cbi-button-apply" />
-		<input type="reset" value="<%:Reset%>" class="cbi-button cbi-button-reset" />
+		<input type="submit" value="<%:Login%>" class="btn cbi-button cbi-button-apply" />
+		<input type="reset" value="<%:Reset%>" class="btn cbi-button cbi-button-reset" />
 	</div>
 </form>
 <script type="text/javascript">//<![CDATA[
@@ -63,7 +63,7 @@ if https_port and fs.access(https_key) then
 		var url = 'https://' + window.location.hostname + ':' + '<%=https_port%>' + window.location.pathname;
 		var img=new Image;
 		img.onload=function(){window.location = url};
-		img.src='https://' + window.location.hostname + ':' + '<%=https_port%>' + '<%=resource%>/cbi/up.gif?' + Math.random();;
+		img.src='https://' + window.location.hostname + ':' + '<%=https_port%>' + '<%=resource%>/icons/loading.gif?' + Math.random();
 		setTimeout(function(){
 			img.src=''
 		}, 5000);

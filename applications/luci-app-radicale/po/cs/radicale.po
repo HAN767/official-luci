@@ -1,19 +1,20 @@
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2019-12-05 17:07+0000\n"
-"Last-Translator: Jiri Tersel <jiri.tersel@seznam.cz>\n"
+"PO-Revision-Date: 2021-04-09 08:04+0000\n"
+"Last-Translator: Pavel Pernička <pernicka.pa@gmail.com>\n"
 "Language-Team: Czech <https://hosted.weblate.org/projects/openwrt/"
 "luciapplicationsradicale/cs/>\n"
 "Language: cs\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
-"X-Generator: Weblate 3.10-dev\n"
+"X-Generator: Weblate 4.6-dev\n"
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:268
 msgid ""
 "'AUTO' selects the highest protocol version that client and server support."
 msgstr ""
+"'AUTO' vybere nejvyšší verzi protokolu podporovanou klientem i serverem."
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:223
 msgid ""
@@ -21,24 +22,9 @@ msgid ""
 msgstr ""
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:272
+#, fuzzy
 msgid "AUTO"
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:734
-msgid "Access-Control-Allow-Headers"
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:726
-msgid "Access-Control-Allow-Methods"
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:718
-msgid "Access-Control-Allow-Origin"
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:742
-msgid "Access-Control-Expose-Headers"
-msgstr ""
+msgstr "AUTO"
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:706
 msgid "Additional HTTP headers"
@@ -51,7 +37,7 @@ msgstr ""
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:80
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:341
 msgid "Authentication"
-msgstr "Autentizace"
+msgstr "Ověřování se"
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:87
 msgid ""
@@ -95,10 +81,6 @@ msgid ""
 "to the client and/or to store data inside collections."
 msgstr ""
 
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:334
-msgid "Ciphers"
-msgstr ""
-
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:544
 msgid "Console Log level"
 msgstr ""
@@ -118,14 +100,6 @@ msgid ""
 "Cross-origin resource sharing (CORS) is a mechanism that allows restricted "
 "resources (e.g. fonts, JavaScript, etc.) on a web page to be requested from "
 "another domain outside the domain from which the resource originated."
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:491
-msgid "Custom"
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:490
-msgid "Database"
 msgstr ""
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:548
@@ -232,6 +206,10 @@ msgstr ""
 msgid "Full path and file name of private key"
 msgstr ""
 
+#: applications/luci-app-radicale/root/usr/share/rpcd/acl.d/luci-app-radicale.json:3
+msgid "Grant UCI access for luci-app-radicale"
+msgstr ""
+
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:549
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:571
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:593
@@ -288,10 +266,6 @@ msgstr "Žádný"
 
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:654
 msgid "Number of backup files of log to create."
-msgstr ""
-
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:335
-msgid "OPTIONAL: See python's ssl module for available ciphers"
 msgstr ""
 
 #: applications/luci-app-radicale/luasrc/view/radicale/tabmap_nsections.htm:50
@@ -522,10 +496,6 @@ msgstr ""
 msgid "crypt"
 msgstr ""
 
-#: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:364
-msgid "custom"
-msgstr "vlastní"
-
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:357
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:400
 msgid "htpasswd file"
@@ -557,3 +527,6 @@ msgstr "vyžadováno"
 #: applications/luci-app-radicale/luasrc/model/cbi/radicale.lua:393
 msgid "salted SHA-1"
 msgstr ""
+
+#~ msgid "custom"
+#~ msgstr "vlastní"

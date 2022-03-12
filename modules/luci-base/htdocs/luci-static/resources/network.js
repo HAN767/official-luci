@@ -2,10 +2,12 @@
 'require uci';
 'require rpc';
 'require validation';
+'require baseclass';
+'require firewall';
 
 var proto_errors = {
 	CONNECT_FAILED:			_('Connection attempt failed'),
-	INVALID_ADDRESS:		_('IP address in invalid'),
+	INVALID_ADDRESS:		_('IP address is invalid'),
 	INVALID_GATEWAY:		_('Gateway address is invalid'),
 	INVALID_LOCAL_ADDRESS:	_('Local IP address is invalid'),
 	MISSING_ADDRESS:		_('IP address is missing'),
@@ -99,6 +101,15 @@ var _init = null,
     _protocols = {},
     _protospecs = {};
 
+function strcmp(a, b) {
+	if (a > b)
+		return 1;
+	else if (a < b)
+		return -1;
+	else
+		return 0;
+}
+
 function getProtocolHandlers(cache) {
 	return callNetworkProtoHandlers().then(function(protos) {
 		/* Register "none" protocol */
@@ -106,7 +117,7 @@ function getProtocolHandlers(cache) {
 			Object.assign(protos, { none: { no_device: false } });
 
 		/* Hack: emulate relayd protocol */
-		if (!protos.hasOwnProperty('relay'))
+		if (!protos.hasOwnProperty('relay') && L.hasSystemFeature('relayd'))
 			Object.assign(protos, { relay: { no_device: true } });
 
 		Object.assign(_protospecs, protos);
@@ -354,7 +365,9 @@ function initNetworkState(refresh) {
 			L.resolveDefault(callLuciWirelessDevices(), {}),
 			L.resolveDefault(callLuciHostHints(), {}),
 			getProtocolHandlers(),
-			uci.load(['network', 'wireless', 'luci'])
+			L.resolveDefault(uci.load('network')),
+			L.resolveDefault(uci.load('wireless')),
+			L.resolveDefault(uci.load('luci'))
 		]).then(function(data) {
 			var netifd_ifaces = data[0],
 			    board_json    = data[1],
@@ -380,12 +393,15 @@ function initNetworkState(refresh) {
 					name:     name,
 					rawname:  name,
 					flags:    dev.flags,
+					link:     dev.link,
 					stats:    dev.stats,
 					macaddr:  dev.mac,
 					type:     dev.type,
+					devtype:  dev.devtype,
 					mtu:      dev.mtu,
 					qlen:     dev.qlen,
 					wireless: dev.wireless,
+					parent:   dev.parent,
 					ipaddrs:  [],
 					ip6addrs: []
 				};
@@ -424,6 +440,16 @@ function initNetworkState(refresh) {
 
 				s.bridges[name] = b;
 				s.isBridge[name] = true;
+			}
+
+			for (var name in luci_devs) {
+				var dev = luci_devs[name];
+
+				if (!dev.parent || dev.devtype != 'dsa')
+					continue;
+
+				s.isSwitch[dev.parent] = true;
+				s.isSwitch[name] = true;
 			}
 
 			if (L.isObject(board_json.switch)) {
@@ -536,7 +562,7 @@ function ifnameOf(obj) {
 }
 
 function networkSort(a, b) {
-	return a.getName() > b.getName();
+	return strcmp(a.getName(), b.getName());
 }
 
 function deviceSort(a, b) {
@@ -547,7 +573,7 @@ function deviceSort(a, b) {
     if (weightA != weightB)
     	return weightA - weightB;
 
-	return a.getName() > b.getName();
+	return strcmp(a.getName(), b.getName());
 }
 
 function formatWifiEncryption(enc) {
@@ -632,18 +658,18 @@ function enumerateNetworks() {
 var Hosts, Network, Protocol, Device, WifiDevice, WifiNetwork;
 
 /**
- * @class
+ * @class network
  * @memberof LuCI
  * @hideconstructor
  * @classdesc
  *
- * The `LuCI.Network` class combines data from multiple `ubus` apis to
+ * The `LuCI.network` class combines data from multiple `ubus` apis to
  * provide an abstraction of the current network configuration state.
  *
  * It provides methods to enumerate interfaces and devices, to query
  * current configuration details and to manipulate settings.
  */
-Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
+Network = baseclass.extend(/** @lends LuCI.network.prototype */ {
 	/**
 	 * Converts the given prefix size in bits to a netmask.
 	 *
@@ -686,8 +712,8 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * such as the used key management protocols, active ciphers and
 	 * protocol versions.
 	 *
-	 * @typedef {Object<string, boolean|Array<number|string>>} LuCI.Network.WifiEncryption
-	 * @memberof LuCI.Network
+	 * @typedef {Object<string, boolean|Array<number|string>>} LuCI.network.WifiEncryption
+	 * @memberof LuCI.network
 	 *
 	 * @property {boolean} enabled
 	 * Specifies whether any kind of encryption, such as `WEP` or `WPA` is
@@ -721,13 +747,13 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 */
 
 	/**
-	 * Converts a given {@link LuCI.Network.WifiEncryption encryption entry}
+	 * Converts a given {@link LuCI.network.WifiEncryption encryption entry}
 	 * into a human readable string such as `mixed WPA/WPA2 PSK (TKIP, CCMP)`
 	 * or `WPA3 SAE (CCMP)`.
 	 *
 	 * @method
 	 *
-	 * @param {LuCI.Network.WifiEncryption} encryption
+	 * @param {LuCI.network.WifiEncryption} encryption
 	 * The wireless encryption entry to convert.
 	 *
 	 * @returns {null|string}
@@ -749,7 +775,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Instantiates the given {@link LuCI.Network.Protocol Protocol} backend,
+	 * Instantiates the given {@link LuCI.network.Protocol Protocol} backend,
 	 * optionally using the given network name.
 	 *
 	 * @param {string} protoname
@@ -761,7 +787,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * but it is allowed to omit it, e.g. to query protocol capabilities
 	 * without the need for an existing interface.
 	 *
-	 * @returns {null|LuCI.Network.Protocol}
+	 * @returns {null|LuCI.network.Protocol}
 	 * Returns the instantiated protocol backend class or `null` if the given
 	 * protocol isn't known.
 	 */
@@ -774,10 +800,10 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Obtains instances of all known {@link LuCI.Network.Protocol Protocol}
+	 * Obtains instances of all known {@link LuCI.network.Protocol Protocol}
 	 * backend classes.
 	 *
-	 * @returns {Array<LuCI.Network.Protocol>}
+	 * @returns {Array<LuCI.network.Protocol>}
 	 * Returns an array of protocol class instances.
 	 */
 	getProtocols: function() {
@@ -790,7 +816,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Registers a new {@link LuCI.Network.Protocol Protocol} subclass
+	 * Registers a new {@link LuCI.network.Protocol Protocol} subclass
 	 * with the given methods and returns the resulting subclass value.
 	 *
 	 * This functions internally calls
@@ -804,7 +830,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * The member methods and values of the new `Protocol` subclass to
 	 * be passed to {@link LuCI.Class.extend Class.extend()}.
 	 *
-	 * @returns {LuCI.Network.Protocol}
+	 * @returns {LuCI.network.Protocol}
 	 * Returns the new `Protocol` subclass.
 	 */
 	registerProtocol: function(protoname, methods) {
@@ -893,7 +919,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * An object of uci option values to set on the new network or to
 	 * update in an existing, empty network.
 	 *
-	 * @returns {Promise<null|LuCI.Network.Protocol>}
+	 * @returns {Promise<null|LuCI.network.Protocol>}
 	 * Returns a promise resolving to the `Protocol` subclass instance
 	 * describing the added network or resolving to `null` if the name
 	 * was invalid or if a non-empty network of the given name already
@@ -925,15 +951,15 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Get a {@link LuCI.Network.Protocol Protocol} instance describing
+	 * Get a {@link LuCI.network.Protocol Protocol} instance describing
 	 * the network with the given name.
 	 *
 	 * @param {string} name
 	 * The logical interface name of the network get, e.g. `lan` or `wan`.
 	 *
-	 * @returns {Promise<null|LuCI.Network.Protocol>}
+	 * @returns {Promise<null|LuCI.network.Protocol>}
 	 * Returns a promise resolving to a
-	 * {@link LuCI.Network.Protocol Protocol} subclass instance describing
+	 * {@link LuCI.network.Protocol Protocol} subclass instance describing
 	 * the network or `null` if the network did not exist.
 	 */
 	getNetwork: function(name) {
@@ -956,9 +982,9 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	/**
 	 * Gets an array containing all known networks.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.Protocol>>}
+	 * @returns {Promise<Array<LuCI.network.Protocol>>}
 	 * Returns a promise resolving to a name-sorted array of
-	 * {@link LuCI.Network.Protocol Protocol} subclass instances
+	 * {@link LuCI.network.Protocol Protocol} subclass instances
 	 * describing all known networks.
 	 */
 	getNetworks: function() {
@@ -978,47 +1004,63 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * `false` if the given network could not be found.
 	 */
 	deleteNetwork: function(name) {
-		var requireFirewall = Promise.resolve(L.require('firewall')).catch(function() {});
+		var requireFirewall = Promise.resolve(L.require('firewall')).catch(function() {}),
+		    loadDHCP = L.resolveDefault(uci.load('dhcp')),
+		    network = this.instantiateNetwork(name);
 
-		return Promise.all([ requireFirewall, initNetworkState() ]).then(function() {
-			var uciInterface = uci.get('network', name);
+		return Promise.all([ requireFirewall, loadDHCP, initNetworkState() ]).then(function(res) {
+			var uciInterface = uci.get('network', name),
+			    firewall = res[0];
 
 			if (uciInterface != null && uciInterface['.type'] == 'interface') {
-				uci.remove('network', name);
+				return Promise.resolve(network ? network.deleteConfiguration() : null).then(function() {
+					uci.remove('network', name);
 
-				uci.sections('luci', 'ifstate', function(s) {
-					if (s.interface == name)
-						uci.remove('luci', s['.name']);
+					uci.sections('luci', 'ifstate', function(s) {
+						if (s.interface == name)
+							uci.remove('luci', s['.name']);
+					});
+
+					uci.sections('network', null, function(s) {
+						switch (s['.type']) {
+						case 'alias':
+						case 'route':
+						case 'route6':
+							if (s.interface == name)
+								uci.remove('network', s['.name']);
+
+							break;
+
+						case 'rule':
+						case 'rule6':
+							if (s.in == name || s.out == name)
+								uci.remove('network', s['.name']);
+
+							break;
+						}
+					});
+
+					uci.sections('wireless', 'wifi-iface', function(s) {
+						var networks = L.toArray(s.network).filter(function(network) { return network != name });
+
+						if (networks.length > 0)
+							uci.set('wireless', s['.name'], 'network', networks.join(' '));
+						else
+							uci.unset('wireless', s['.name'], 'network');
+					});
+
+					uci.sections('dhcp', 'dhcp', function(s) {
+						if (s.interface == name)
+							uci.remove('dhcp', s['.name']);
+					});
+
+					if (firewall)
+						return firewall.deleteNetwork(name).then(function() { return true });
+
+					return true;
+				}).catch(function() {
+					return false;
 				});
-
-				uci.sections('network', 'alias', function(s) {
-					if (s.interface == name)
-						uci.remove('network', s['.name']);
-				});
-
-				uci.sections('network', 'route', function(s) {
-					if (s.interface == name)
-						uci.remove('network', s['.name']);
-				});
-
-				uci.sections('network', 'route6', function(s) {
-					if (s.interface == name)
-						uci.remove('network', s['.name']);
-				});
-
-				uci.sections('wireless', 'wifi-iface', function(s) {
-					var networks = L.toArray(s.network).filter(function(network) { return network != name });
-
-					if (networks.length > 0)
-						uci.set('wireless', s['.name'], 'network', networks.join(' '));
-					else
-						uci.unset('wireless', s['.name'], 'network');
-				});
-
-				if (L.firewall)
-					return L.firewall.deleteNetwork(name).then(function() { return true });
-
-				return true;
 			}
 
 			return false;
@@ -1091,13 +1133,13 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Get a {@link LuCI.Network.Device Device} instance describing the
+	 * Get a {@link LuCI.network.Device Device} instance describing the
 	 * given network device.
 	 *
 	 * @param {string} name
 	 * The name of the network device to get, e.g. `eth0` or `br-lan`.
 	 *
-	 * @returns {Promise<null|LuCI.Network.Device>}
+	 * @returns {Promise<null|LuCI.network.Device>}
 	 * Returns a promise resolving to the `Device` instance describing
 	 * the network device or `null` if the given device name could not
 	 * be found.
@@ -1107,7 +1149,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 			if (name == null)
 				return null;
 
-			if (_state.netdevs.hasOwnProperty(name) || isWifiIfname(name))
+			if (_state.netdevs.hasOwnProperty(name))
 				return this.instantiateDevice(name);
 
 			var netid = getWifiNetidBySid(name);
@@ -1121,7 +1163,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	/**
 	 * Get a sorted list of all found network devices.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.Device>>}
+	 * @returns {Promise<Array<LuCI.network.Device>>}
 	 * Returns a promise resolving to a sorted array of `Device` class
 	 * instances describing the network devices found on the system.
 	 */
@@ -1199,6 +1241,59 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 				}
 			}
 
+			/* find bridge VLAN devices */
+			var uciBridgeVLANs = uci.sections('network', 'bridge-vlan');
+			for (var i = 0; i < uciBridgeVLANs.length; i++) {
+				var basedev = uciBridgeVLANs[i].device,
+				    local = uciBridgeVLANs[i].local,
+				    alias = uciBridgeVLANs[i].alias,
+				    vid = +uciBridgeVLANs[i].vlan,
+				    ports = L.toArray(uciBridgeVLANs[i].ports);
+
+				if (local == '0')
+					continue;
+
+				if (isNaN(vid) || vid < 0 || vid > 4095)
+					continue;
+
+				var vlandev = '%s.%s'.format(basedev, alias || vid);
+
+				_state.isBridge[basedev] = true;
+
+				if (!_state.bridges.hasOwnProperty(basedev))
+					_state.bridges[basedev] = {
+						name:    basedev,
+						ifnames: []
+					};
+
+				if (!devices.hasOwnProperty(vlandev))
+					devices[vlandev] = this.instantiateDevice(vlandev);
+
+				ports.forEach(function(port_name) {
+					var m = port_name.match(/^([^:]+)(?::[ut*]+)?$/),
+					    p = m ? m[1] : null;
+
+					if (!p)
+						return;
+
+					if (_state.bridges[basedev].ifnames.filter(function(sd) { return sd.name == p }).length)
+						return;
+
+					_state.netdevs[p] = _state.netdevs[p] || {
+						name: p,
+						ipaddrs: [],
+						ip6addrs: [],
+						type: 1,
+						devtype: 'ethernet',
+						stats: {},
+						flags: {}
+					};
+
+					_state.bridges[basedev].ifnames.push(_state.netdevs[p]);
+					_state.netdevs[p].bridge = _state.bridges[basedev];
+				});
+			}
+
 			/* find wireless interfaces */
 			var uciWifiIfaces = uci.sections('wireless', 'wifi-iface'),
 			    networkCount = {};
@@ -1212,6 +1307,22 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 				var netid = '%s.network%d'.format(uciWifiIfaces[i].device, networkCount[uciWifiIfaces[i].device]);
 
 				devices[netid] = this.instantiateDevice(netid);
+			}
+
+			/* find uci declared devices */
+			var uciDevices = uci.sections('network', 'device');
+
+			for (var i = 0; i < uciDevices.length; i++) {
+				var type = uciDevices[i].type,
+				    name = uciDevices[i].name;
+
+				if (!type || !name || devices.hasOwnProperty(name))
+					continue;
+
+				if (type == 'bridge')
+					_state.isBridge[name] = true;
+
+				devices[name] = this.instantiateDevice(name);
 			}
 
 			var rv = [];
@@ -1246,14 +1357,14 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Get a {@link LuCI.Network.WifiDevice WifiDevice} instance describing
+	 * Get a {@link LuCI.network.WifiDevice WifiDevice} instance describing
 	 * the given wireless radio.
 	 *
 	 * @param {string} devname
 	 * The configuration name of the wireless radio to lookup, e.g. `radio0`
 	 * for the first mac80211 phy on the system.
 	 *
-	 * @returns {Promise<null|LuCI.Network.WifiDevice>}
+	 * @returns {Promise<null|LuCI.network.WifiDevice>}
 	 * Returns a promise resolving to the `WifiDevice` instance describing
 	 * the underlying radio device or `null` if the wireless radio could not
 	 * be found.
@@ -1272,7 +1383,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	/**
 	 * Obtain a list of all configured radio devices.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.WifiDevice>>}
+	 * @returns {Promise<Array<LuCI.network.WifiDevice>>}
 	 * Returns a promise resolving to an array of `WifiDevice` instances
 	 * describing the wireless radios configured in the system.
 	 * The order of the array corresponds to the order of the radios in
@@ -1293,7 +1404,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Get a {@link LuCI.Network.WifiNetwork WifiNetwork} instance describing
+	 * Get a {@link LuCI.network.WifiNetwork WifiNetwork} instance describing
 	 * the given wireless network.
 	 *
 	 * @param {string} netname
@@ -1302,7 +1413,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * or a Linux network device name like `wlan0` which is resolved to the
 	 * corresponding configuration section through `ubus` runtime information.
 	 *
-	 * @returns {Promise<null|LuCI.Network.WifiNetwork>}
+	 * @returns {Promise<null|LuCI.network.WifiNetwork>}
 	 * Returns a promise resolving to the `WifiNetwork` instance describing
 	 * the wireless network or `null` if the corresponding network could not
 	 * be found.
@@ -1313,10 +1424,10 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	},
 
 	/**
-	 * Get an array of all {@link LuCI.Network.WifiNetwork WifiNetwork}
+	 * Get an array of all {@link LuCI.network.WifiNetwork WifiNetwork}
 	 * instances describing the wireless networks present on the system.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.WifiNetwork>>}
+	 * @returns {Promise<Array<LuCI.network.WifiNetwork>>}
 	 * Returns a promise resolving to an array of `WifiNetwork` instances
 	 * describing the wireless networks. The array will be empty if no networks
 	 * are found.
@@ -1330,7 +1441,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 				rv.push(this.lookupWifiNetwork(wifiIfaces[i]['.name']));
 
 			rv.sort(function(a, b) {
-				return (a.getID() > b.getID());
+				return strcmp(a.getID(), b.getID());
 			});
 
 			return rv;
@@ -1346,7 +1457,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * must at least contain a `device` property which is set to the radio
 	 * name the new network belongs to.
 	 *
-	 * @returns {Promise<null|LuCI.Network.WifiNetwork>}
+	 * @returns {Promise<null|LuCI.network.WifiNetwork>}
 	 * Returns a promise resolving to a `WifiNetwork` instance describing
 	 * the newly added wireless network or `null` if the given options
 	 * were invalid or if the associated radio device could not be found.
@@ -1427,6 +1538,13 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 				}
 			}
 
+			rv.sort(function(a, b) {
+				if (a.metric != b.metric)
+					return (a.metric - b.metric);
+
+				return strcmp(a.interface, b.interface);
+			});
+
 			return rv;
 		}, this));
 	},
@@ -1467,7 +1585,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * This function looks up all networks having a default `0.0.0.0/0` route
 	 * and returns them as array.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.Protocol>>}
+	 * @returns {Promise<Array<LuCI.network.Protocol>>}
 	 * Returns a promise resolving to an array of `Protocol` subclass
 	 * instances describing the found default route interfaces.
 	 */
@@ -1492,7 +1610,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * This function looks up all networks having a default `::/0` route
 	 * and returns them as array.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.Protocol>>}
+	 * @returns {Promise<Array<LuCI.network.Protocol>>}
 	 * Returns a promise resolving to an array of `Protocol` subclass
 	 * instances describing the found IPv6 default route interfaces.
 	 */
@@ -1516,7 +1634,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 * connections and external port labels of a switch.
 	 *
 	 * @typedef {Object<string, Object|Array>} SwitchTopology
-	 * @memberof LuCI.Network
+	 * @memberof LuCI.network
 	 *
 	 * @property {Object<number, string>} netdevs
 	 * The `netdevs` property points to an object describing the CPU port
@@ -1538,11 +1656,11 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	/**
 	 * Returns the topologies of all swconfig switches found on the system.
 	 *
-	 * @returns {Promise<Object<string, LuCI.Network.SwitchTopology>>}
+	 * @returns {Promise<Object<string, LuCI.network.SwitchTopology>>}
 	 * Returns a promise resolving to an object containing the topologies
 	 * of each switch. The object keys correspond to the name of the switches
 	 * such as `switch0`, the values are
-	 * {@link LuCI.Network.SwitchTopology SwitchTopology} objects describing
+	 * {@link LuCI.network.SwitchTopology SwitchTopology} objects describing
 	 * the layout.
 	 */
 	getSwitchTopologies: function() {
@@ -1633,7 +1751,7 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	/**
 	 * Obtains the the network device name of the given object.
 	 *
-	 * @param {LuCI.Network.Protocol|LuCI.Network.Device|LuCI.Network.WifiDevice|LuCI.Network.WifiNetwork|string} obj
+	 * @param {LuCI.network.Protocol|LuCI.network.Device|LuCI.network.WifiDevice|LuCI.network.WifiNetwork|string} obj
 	 * The object to get the device name from.
 	 *
 	 * @returns {null|string}
@@ -1662,10 +1780,10 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 	 *
 	 * This function aggregates information from various sources such as
 	 * DHCP lease databases, ARP and IPv6 neighbour entries, wireless
-	 * association list etc. and returns a {@link LuCI.Network.Hosts Hosts}
+	 * association list etc. and returns a {@link LuCI.network.Hosts Hosts}
 	 * class instance describing the found hosts.
 	 *
-	 * @returns {Promise<LuCI.Network.Hosts>}
+	 * @returns {Promise<LuCI.network.Hosts>}
 	 * Returns a `Hosts` instance describing host known on the system.
 	 */
 	getHostHints: function() {
@@ -1677,15 +1795,15 @@ Network = L.Class.extend(/** @lends LuCI.Network.prototype */ {
 
 /**
  * @class
- * @memberof LuCI.Network
+ * @memberof LuCI.network
  * @hideconstructor
  * @classdesc
  *
- * The `LuCI.Network.Hosts` class encapsulates host information aggregated
+ * The `LuCI.network.Hosts` class encapsulates host information aggregated
  * from multiple sources and provides convenience functions to access the
  * host information by different criteria.
  */
-Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
+Hosts = baseclass.extend(/** @lends LuCI.network.Hosts.prototype */ {
 	__init__: function(hosts) {
 		this.hosts = hosts;
 	},
@@ -1702,7 +1820,9 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getHostnameByMACAddr: function(mac) {
-		return this.hosts[mac] ? this.hosts[mac].name : null;
+		return this.hosts[mac]
+			? (this.hosts[mac].name || null)
+			: null;
 	},
 
 	/**
@@ -1717,7 +1837,9 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getIPAddrByMACAddr: function(mac) {
-		return this.hosts[mac] ? this.hosts[mac].ipv4 : null;
+		return this.hosts[mac]
+			? (L.toArray(this.hosts[mac].ipaddrs || this.hosts[mac].ipv4)[0] || null)
+			: null;
 	},
 
 	/**
@@ -1732,7 +1854,9 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getIP6AddrByMACAddr: function(mac) {
-		return this.hosts[mac] ? this.hosts[mac].ipv6 : null;
+		return this.hosts[mac]
+			? (L.toArray(this.hosts[mac].ip6addrs || this.hosts[mac].ipv6)[0] || null)
+			: null;
 	},
 
 	/**
@@ -1747,9 +1871,17 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getHostnameByIPAddr: function(ipaddr) {
-		for (var mac in this.hosts)
-			if (this.hosts[mac].ipv4 == ipaddr && this.hosts[mac].name != null)
-				return this.hosts[mac].name;
+		for (var mac in this.hosts) {
+			if (this.hosts[mac].name == null)
+				continue;
+
+			var addrs = L.toArray(this.hosts[mac].ipaddrs || this.hosts[mac].ipv4);
+
+			for (var i = 0; i < addrs.length; i++)
+				if (addrs[i] == ipaddr)
+					return this.hosts[mac].name;
+		}
+
 		return null;
 	},
 
@@ -1765,16 +1897,21 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getMACAddrByIPAddr: function(ipaddr) {
-		for (var mac in this.hosts)
-			if (this.hosts[mac].ipv4 == ipaddr)
-				return mac;
+		for (var mac in this.hosts) {
+			var addrs = L.toArray(this.hosts[mac].ipaddrs || this.hosts[mac].ipv4);
+
+			for (var i = 0; i < addrs.length; i++)
+				if (addrs[i] == ipaddr)
+					return mac;
+		}
+
 		return null;
 	},
 
 	/**
 	 * Lookup the hostname associated with the given IPv6 address.
 	 *
-	 * @param {string} ipaddr
+	 * @param {string} ip6addr
 	 * The IPv6 address to lookup.
 	 *
 	 * @returns {null|string}
@@ -1783,16 +1920,24 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getHostnameByIP6Addr: function(ip6addr) {
-		for (var mac in this.hosts)
-			if (this.hosts[mac].ipv6 == ip6addr && this.hosts[mac].name != null)
-				return this.hosts[mac].name;
+		for (var mac in this.hosts) {
+			if (this.hosts[mac].name == null)
+				continue;
+
+			var addrs = L.toArray(this.hosts[mac].ip6addrs || this.hosts[mac].ipv6);
+
+			for (var i = 0; i < addrs.length; i++)
+				if (addrs[i] == ip6addr)
+					return this.hosts[mac].name;
+		}
+
 		return null;
 	},
 
 	/**
 	 * Lookup the MAC address associated with the given IPv6 address.
 	 *
-	 * @param {string} ipaddr
+	 * @param {string} ip6addr
 	 * The IPv6 address to lookup.
 	 *
 	 * @returns {null|string}
@@ -1801,9 +1946,14 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 * the corresponding host.
 	 */
 	getMACAddrByIP6Addr: function(ip6addr) {
-		for (var mac in this.hosts)
-			if (this.hosts[mac].ipv6 == ip6addr)
-				return mac;
+		for (var mac in this.hosts) {
+			var addrs = L.toArray(this.hosts[mac].ip6addrs || this.hosts[mac].ipv6);
+
+			for (var i = 0; i < addrs.length; i++)
+				if (addrs[i] == ip6addr)
+					return mac;
+		}
+
 		return null;
 	},
 
@@ -1830,20 +1980,24 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
 	 */
 	getMACHints: function(preferIp6) {
 		var rv = [];
+
 		for (var mac in this.hosts) {
 			var hint = this.hosts[mac].name ||
-				this.hosts[mac][preferIp6 ? 'ipv6' : 'ipv4'] ||
-				this.hosts[mac][preferIp6 ? 'ipv4' : 'ipv6'];
+				L.toArray(this.hosts[mac][preferIp6 ? 'ip6addrs' : 'ipaddrs'] || this.hosts[mac][preferIp6 ? 'ipv6' : 'ipv4'])[0] ||
+				L.toArray(this.hosts[mac][preferIp6 ? 'ipaddrs' : 'ip6addrs'] || this.hosts[mac][preferIp6 ? 'ipv4' : 'ipv6'])[0];
 
 			rv.push([mac, hint]);
 		}
-		return rv.sort(function(a, b) { return a[0] > b[0] });
+
+		return rv.sort(function(a, b) {
+			return strcmp(a[0], b[0]);
+		});
 	}
 });
 
 /**
  * @class
- * @memberof LuCI.Network
+ * @memberof LuCI.network
  * @hideconstructor
  * @classdesc
  *
@@ -1851,7 +2005,7 @@ Hosts = L.Class.extend(/** @lends LuCI.Network.Hosts.prototype */ {
  * subclasses which describe logical UCI networks defined by `config
  * interface` sections in `/etc/config/network`.
  */
-Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
+Protocol = baseclass.extend(/** @lends LuCI.network.Protocol.prototype */ {
 	__init__: function(name) {
 		this.sid = name;
 	},
@@ -1928,7 +2082,7 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 * Get the name of this network protocol class.
 	 *
 	 * This function will be overwritten by subclasses created by
-	 * {@link LuCI.Network#registerProtocol Network.registerProtocol()}.
+	 * {@link LuCI.network#registerProtocol Network.registerProtocol()}.
 	 *
 	 * @abstract
 	 * @returns {string}
@@ -1962,7 +2116,7 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 * Get the type of the underlying interface.
 	 *
 	 * This function actually is a convenience wrapper around
-	 * `proto.get("type")` and is mainly used by other `LuCI.Network` code
+	 * `proto.get("type")` and is mainly used by other `LuCI.network` code
 	 * to check whether the interface is declared as bridge in UCI.
 	 *
 	 * @returns {null|string}
@@ -2246,7 +2400,7 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 *
 	 * This function will translate the found error codes to human readable
 	 * messages using the descriptions registered by
-	 * {@link LuCI.Network#registerErrorCode Network.registerErrorCode()}
+	 * {@link LuCI.network#registerErrorCode Network.registerErrorCode()}
 	 * and fall back to `"Unknown error (%s)"` where `%s` is replaced by the
 	 * error code in case no translation can be found.
 	 *
@@ -2295,6 +2449,24 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 */
 	getOpkgPackage: function() {
 		return null;
+	},
+
+	/**
+	 * Check function for the protocol handler if a new interface is createable.
+	 *
+	 * This function should be overwritten by protocol specific subclasses.
+	 *
+	 * @abstract
+	 *
+	 * @param {string} ifname
+	 * The name of the interface to be created.
+	 *
+	 * @returns {Promise<void>}
+	 * Returns a promise resolving if new interface is createable, else
+	 * rejects with an error message string.
+	 */
+	isCreateable: function(ifname) {
+		return Promise.resolve(null);
 	},
 
 	/**
@@ -2375,14 +2547,14 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 *
 	 * Alias interfaces are interfaces layering on top of another interface
 	 * and are denoted by a special `@interfacename` notation in the
-	 * underlying `ifname` option.
+	 * underlying `device` option.
 	 *
 	 * @returns {null|string}
 	 * Returns the name of the parent interface if this logical interface
 	 * is an alias or `null` if it is not an alias interface.
 	 */
 	isAlias: function() {
-		var ifnames = L.toArray(uci.get('network', this.sid, 'ifname')),
+		var ifnames = L.toArray(uci.get('network', this.sid, 'device')),
 		    parent = null;
 
 		for (var i = 0; i < ifnames.length; i++)
@@ -2406,9 +2578,9 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 			return false;
 
 		var empty = true,
-		    ifname = this._get('ifname');
+		    device = this._get('device');
 
-		if (ifname != null && ifname.match(/\S+/))
+		if (device != null && device.match(/\S+/))
 			empty = false;
 
 		if (empty == true && getWifiNetidBySid(this.sid) != null)
@@ -2430,57 +2602,57 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	/**
 	 * Add the given network device to the logical interface.
 	 *
-	 * @param {LuCI.Network.Protocol|LuCI.Network.Device|LuCI.Network.WifiDevice|LuCI.Network.WifiNetwork|string} device
+	 * @param {LuCI.network.Protocol|LuCI.network.Device|LuCI.network.WifiDevice|LuCI.network.WifiNetwork|string} device
 	 * The object or device name to add to the logical interface. In case the
 	 * given argument is not a string, it is resolved though the
-	 * {@link LuCI.Network#getIfnameOf Network.getIfnameOf()} function.
+	 * {@link LuCI.network#getIfnameOf Network.getIfnameOf()} function.
 	 *
 	 * @returns {boolean}
 	 * Returns `true` if the device name has been added or `false` if any
 	 * argument was invalid, if the device was already part of the logical
 	 * interface or if the logical interface is virtual.
 	 */
-	addDevice: function(ifname) {
-		ifname = ifnameOf(ifname);
+	addDevice: function(device) {
+		device = ifnameOf(device);
 
-		if (ifname == null || this.isFloating())
+		if (device == null || this.isFloating())
 			return false;
 
-		var wif = getWifiSidByIfname(ifname);
+		var wif = getWifiSidByIfname(device);
 
 		if (wif != null)
 			return appendValue('wireless', wif, 'network', this.sid);
 
-		return appendValue('network', this.sid, 'ifname', ifname);
+		return appendValue('network', this.sid, 'device', device);
 	},
 
 	/**
 	 * Remove the given network device from the logical interface.
 	 *
-	 * @param {LuCI.Network.Protocol|LuCI.Network.Device|LuCI.Network.WifiDevice|LuCI.Network.WifiNetwork|string} device
+	 * @param {LuCI.network.Protocol|LuCI.network.Device|LuCI.network.WifiDevice|LuCI.network.WifiNetwork|string} device
 	 * The object or device name to remove from the logical interface. In case
 	 * the given argument is not a string, it is resolved though the
-	 * {@link LuCI.Network#getIfnameOf Network.getIfnameOf()} function.
+	 * {@link LuCI.network#getIfnameOf Network.getIfnameOf()} function.
 	 *
 	 * @returns {boolean}
 	 * Returns `true` if the device name has been added or `false` if any
 	 * argument was invalid, if the device was already part of the logical
 	 * interface or if the logical interface is virtual.
 	 */
-	deleteDevice: function(ifname) {
+	deleteDevice: function(device) {
 		var rv = false;
 
-		ifname = ifnameOf(ifname);
+		device = ifnameOf(device);
 
-		if (ifname == null || this.isFloating())
+		if (device == null || this.isFloating())
 			return false;
 
-		var wif = getWifiSidByIfname(ifname);
+		var wif = getWifiSidByIfname(device);
 
 		if (wif != null)
 			rv = removeValue('wireless', wif, 'network', this.sid);
 
-		if (removeValue('network', this.sid, 'ifname', ifname))
+		if (removeValue('network', this.sid, 'device', device))
 			rv = true;
 
 		return rv;
@@ -2490,7 +2662,7 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 * Returns the Linux network device associated with this logical
 	 * interface.
 	 *
-	 * @returns {LuCI.Network.Device}
+	 * @returns {LuCI.network.Device}
 	 * Returns a `Network.Device` class instance representing the
 	 * expected Linux network device according to the configuration.
 	 */
@@ -2498,7 +2670,7 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 		if (this.isVirtual()) {
 			var ifname = '%s-%s'.format(this.getProtocol(), this.sid);
 			_state.isTunnel[this.getProtocol() + '-' + this.sid] = true;
-			return L.network.instantiateDevice(ifname, this);
+			return Network.prototype.instantiateDevice(ifname, this);
 		}
 		else if (this.isBridge()) {
 			var ifname = 'br-%s'.format(this.sid);
@@ -2506,16 +2678,16 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 			return new Device(ifname, this);
 		}
 		else {
-			var ifnames = L.toArray(uci.get('network', this.sid, 'ifname'));
+			var ifnames = L.toArray(uci.get('network', this.sid, 'device'));
 
 			for (var i = 0; i < ifnames.length; i++) {
 				var m = ifnames[i].match(/^([^:/]+)/);
-				return ((m && m[1]) ? L.network.instantiateDevice(m[1], this) : null);
+				return ((m && m[1]) ? Network.prototype.instantiateDevice(m[1], this) : null);
 			}
 
 			ifname = getWifiNetidByNetname(this.sid);
 
-			return (ifname != null ? L.network.instantiateDevice(ifname[0], this) : null);
+			return (ifname != null ? Network.prototype.instantiateDevice(ifname[0], this) : null);
 		}
 	},
 
@@ -2523,33 +2695,33 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 * Returns the layer 2 linux network device currently associated
 	 * with this logical interface.
 	 *
-	 * @returns {LuCI.Network.Device}
+	 * @returns {LuCI.network.Device}
 	 * Returns a `Network.Device` class instance representing the Linux
 	 * network device currently associated with the logical interface.
 	 */
 	getL2Device: function() {
 		var ifname = this._ubus('device');
-		return (ifname != null ? L.network.instantiateDevice(ifname, this) : null);
+		return (ifname != null ? Network.prototype.instantiateDevice(ifname, this) : null);
 	},
 
 	/**
 	 * Returns the layer 3 linux network device currently associated
 	 * with this logical interface.
 	 *
-	 * @returns {LuCI.Network.Device}
+	 * @returns {LuCI.network.Device}
 	 * Returns a `Network.Device` class instance representing the Linux
 	 * network device currently associated with the logical interface.
 	 */
 	getL3Device: function() {
 		var ifname = this._ubus('l3_device');
-		return (ifname != null ? L.network.instantiateDevice(ifname, this) : null);
+		return (ifname != null ? Network.prototype.instantiateDevice(ifname, this) : null);
 	},
 
 	/**
 	 * Returns a list of network sub-devices associated with this logical
 	 * interface.
 	 *
-	 * @returns {null|Array<LuCI.Network.Device>}
+	 * @returns {null|Array<LuCI.network.Device>}
 	 * Returns an array of of `Network.Device` class instances representing
 	 * the sub-devices attached to this logical interface or `null` if the
 	 * logical interface does not support sub-devices, e.g. because it is
@@ -2561,15 +2733,12 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 		if (!this.isBridge() && !(this.isVirtual() && !this.isFloating()))
 			return null;
 
-		var ifnames = L.toArray(uci.get('network', this.sid, 'ifname'));
+		var device = uci.get('network', this.sid, 'device');
 
-		for (var i = 0; i < ifnames.length; i++) {
-			if (ifnames[i].charAt(0) == '@')
-				continue;
-
-			var m = ifnames[i].match(/^([^:/]+)/);
+		if (device && device.charAt(0) != '@') {
+			var m = device.match(/^([^:/]+)/);
 			if (m != null)
-				rv.push(L.network.instantiateDevice(m[1], this));
+				rv.push(Network.prototype.instantiateDevice(m[1], this));
 		}
 
 		var uciWifiIfaces = uci.sections('wireless', 'wifi-iface');
@@ -2587,7 +2756,7 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 				var netid = getWifiNetidBySid(uciWifiIfaces[i]['.name']);
 
 				if (netid != null)
-					rv.push(L.network.instantiateDevice(netid[0], this));
+					rv.push(Network.prototype.instantiateDevice(netid[0], this));
 			}
 		}
 
@@ -2600,34 +2769,33 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 	 * Checks whether this logical interface contains the given device
 	 * object.
 	 *
-	 * @param {LuCI.Network.Protocol|LuCI.Network.Device|LuCI.Network.WifiDevice|LuCI.Network.WifiNetwork|string} device
+	 * @param {LuCI.network.Protocol|LuCI.network.Device|LuCI.network.WifiDevice|LuCI.network.WifiNetwork|string} device
 	 * The object or device name to check. In case the given argument is not
 	 * a string, it is resolved though the
-	 * {@link LuCI.Network#getIfnameOf Network.getIfnameOf()} function.
+	 * {@link LuCI.network#getIfnameOf Network.getIfnameOf()} function.
 	 *
 	 * @returns {boolean}
 	 * Returns `true` when this logical interface contains the given network
 	 * device or `false` if not.
 	 */
-	containsDevice: function(ifname) {
-		ifname = ifnameOf(ifname);
+	containsDevice: function(device) {
+		device = ifnameOf(device);
 
-		if (ifname == null)
+		if (device == null)
 			return false;
-		else if (this.isVirtual() && '%s-%s'.format(this.getProtocol(), this.sid) == ifname)
+		else if (this.isVirtual() && '%s-%s'.format(this.getProtocol(), this.sid) == device)
 			return true;
-		else if (this.isBridge() && 'br-%s'.format(this.sid) == ifname)
+		else if (this.isBridge() && 'br-%s'.format(this.sid) == device)
 			return true;
 
-		var ifnames = L.toArray(uci.get('network', this.sid, 'ifname'));
-
-		for (var i = 0; i < ifnames.length; i++) {
-			var m = ifnames[i].match(/^([^:/]+)/);
-			if (m != null && m[1] == ifname)
+		var name = uci.get('network', this.sid, 'device');
+		if (name) {
+			var m = name.match(/^([^:/]+)/);
+			if (m != null && m[1] == device)
 				return true;
 		}
 
-		var wif = getWifiSidByIfname(ifname);
+		var wif = getWifiSidByIfname(device);
 
 		if (wif != null) {
 			var networks = L.toArray(uci.get('wireless', wif, 'network'));
@@ -2638,32 +2806,51 @@ Protocol = L.Class.extend(/** @lends LuCI.Network.Protocol.prototype */ {
 		}
 
 		return false;
-	}
+	},
+
+	/**
+	 * Cleanup related configuration entries.
+	 *
+	 * This function will be invoked if an interface is about to be removed
+	 * from the configuration and is responsible for performing any required
+	 * cleanup tasks, such as unsetting uci entries in related configurations.
+	 *
+	 * It should be overwritten by protocol specific subclasses.
+	 *
+	 * @abstract
+	 *
+	 * @returns {*|Promise<*>}
+	 * This function may return a promise which is awaited before the rest of
+	 * the configuration is removed. Any non-promise return value and any
+	 * resolved promise value is ignored. If the returned promise is rejected,
+	 * the interface removal will be aborted.
+	 */
+	deleteConfiguration: function() {}
 });
 
 /**
  * @class
- * @memberof LuCI.Network
+ * @memberof LuCI.network
  * @hideconstructor
  * @classdesc
  *
  * A `Network.Device` class instance represents an underlying Linux network
  * device and allows querying device details such as packet statistics or MTU.
  */
-Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
-	__init__: function(ifname, network) {
-		var wif = getWifiSidByIfname(ifname);
+Device = baseclass.extend(/** @lends LuCI.network.Device.prototype */ {
+	__init__: function(device, network) {
+		var wif = getWifiSidByIfname(device);
 
 		if (wif != null) {
 			var res = getWifiStateBySid(wif) || [],
 			    netid = getWifiNetidBySid(wif) || [];
 
-			this.wif    = new WifiNetwork(wif, res[0], res[1], netid[0], res[2], { ifname: ifname });
-			this.ifname = this.wif.getIfname();
+			this.wif    = new WifiNetwork(wif, res[0], res[1], netid[0], res[2], { ifname: device });
+			this.device = this.wif.getIfname();
 		}
 
-		this.ifname  = this.ifname || ifname;
-		this.dev     = _state.netdevs[this.ifname];
+		this.device  = this.device || device;
+		this.dev     = Object.assign({}, _state.netdevs[this.device]);
 		this.network = network;
 	},
 
@@ -2686,7 +2873,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	 * Returns the name of the device, e.g. `eth0` or `wlan0`.
 	 */
 	getName: function() {
-		return (this.wif != null ? this.wif.getIfname() : this.ifname);
+		return (this.wif != null ? this.wif.getIfname() : this.device);
 	},
 
 	/**
@@ -2734,7 +2921,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	},
 
 	/**
-	 * Get the type of the device..
+	 * Get the type of the device.
 	 *
 	 * @returns {string}
 	 * Returns a string describing the type of the network device:
@@ -2747,17 +2934,17 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	 *  - `ethernet` for all other device types
 	 */
 	getType: function() {
-		if (this.ifname != null && this.ifname.charAt(0) == '@')
+		if (this.device != null && this.device.charAt(0) == '@')
 			return 'alias';
-		else if (this.wif != null || isWifiIfname(this.ifname))
+		else if (this.dev.devtype == 'wlan' || this.wif != null || isWifiIfname(this.device))
 			return 'wifi';
-		else if (_state.isBridge[this.ifname])
+		else if (this.dev.devtype == 'bridge' || _state.isBridge[this.device])
 			return 'bridge';
-		else if (_state.isTunnel[this.ifname])
+		else if (_state.isTunnel[this.device])
 			return 'tunnel';
-		else if (this.ifname.indexOf('.') > -1)
+		else if (this.dev.devtype == 'vlan' || this.device.indexOf('.') > -1)
 			return 'vlan';
-		else if (_state.isSwitch[this.ifname])
+		else if (this.dev.devtype == 'dsa' || _state.isSwitch[this.device])
 			return 'switch';
 		else
 			return 'ethernet';
@@ -2774,7 +2961,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 		if (this.wif != null)
 			return this.wif.getShortName();
 
-		return this.ifname;
+		return this.device;
 	},
 
 	/**
@@ -2814,10 +3001,11 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 			return _('Bridge');
 
 		case 'switch':
-			return _('Ethernet Switch');
+			return (_state.netdevs[this.device] && _state.netdevs[this.device].devtype == 'dsa')
+				? _('Switch port') : _('Ethernet Switch');
 
 		case 'vlan':
-			return (_state.isSwitch[this.ifname] ? _('Switch VLAN') : _('Software VLAN'));
+			return (_state.isSwitch[this.device] ? _('Switch VLAN') : _('Software VLAN'));
 
 		case 'tunnel':
 			return _('Tunnel Interface');
@@ -2830,20 +3018,20 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	/**
 	 * Get the associated bridge ports of the device.
 	 *
-	 * @returns {null|Array<LuCI.Network.Device>}
+	 * @returns {null|Array<LuCI.network.Device>}
 	 * Returns an array of `Network.Device` instances representing the ports
 	 * (slave interfaces) of the bridge or `null` when this device isn't
 	 * a Linux bridge.
 	 */
 	getPorts: function() {
-		var br = _state.bridges[this.ifname],
+		var br = _state.bridges[this.device],
 		    rv = [];
 
 		if (br == null || !Array.isArray(br.ifnames))
 			return null;
 
 		for (var i = 0; i < br.ifnames.length; i++)
-			rv.push(L.network.instantiateDevice(br.ifnames[i].name));
+			rv.push(Network.prototype.instantiateDevice(br.ifnames[i].name));
 
 		rv.sort(deviceSort);
 
@@ -2858,7 +3046,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	 * device is not a Linux bridge.
 	 */
 	getBridgeID: function() {
-		var br = _state.bridges[this.ifname];
+		var br = _state.bridges[this.device];
 		return (br != null ? br.id : null);
 	},
 
@@ -2870,7 +3058,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	 * enabled, else `false`.
 	 */
 	getBridgeSTP: function() {
-		var br = _state.bridges[this.ifname];
+		var br = _state.bridges[this.device];
 		return (br != null ? !!br.stp : false);
 	},
 
@@ -2957,9 +3145,50 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	},
 
 	/**
+	 * Get the carrier state of the network device.
+	 *
+	 * @returns {boolean}
+	 * Returns true if the device has a carrier, e.g. when a cable is
+	 * inserted into an ethernet port of false if there is none.
+	 */
+	getCarrier: function() {
+		var link = this._devstate('link');
+		return (link != null ? link.carrier || false : false);
+	},
+
+	/**
+	 * Get the current link speed of the network device if available.
+	 *
+	 * @returns {number|null}
+	 * Returns the current speed of the network device in Mbps. If the
+	 * device supports no ethernet speed levels, null is returned.
+	 * If the device supports ethernet speeds but has no carrier, -1 is
+	 * returned.
+	 */
+	getSpeed: function() {
+		var link = this._devstate('link');
+		return (link != null ? link.speed || null : null);
+	},
+
+	/**
+	 * Get the current duplex mode of the network device if available.
+	 *
+	 * @returns {string|null}
+	 * Returns the current duplex mode of the network device. Returns
+	 * either "full" or "half" if the device supports duplex modes or
+	 * null if the duplex mode is unknown or unsupported.
+	 */
+	getDuplex: function() {
+		var link = this._devstate('link'),
+		    duplex = link ? link.duplex : null;
+
+		return (duplex != 'unknown') ? duplex : null;
+	},
+
+	/**
 	 * Get the primary logical interface this device is assigned to.
 	 *
-	 * @returns {null|LuCI.Network.Protocol}
+	 * @returns {null|LuCI.network.Protocol}
 	 * Returns a `Network.Protocol` instance representing the logical
 	 * interface this device is attached to or `null` if it is not
 	 * assigned to any logical interface.
@@ -2971,7 +3200,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	/**
 	 * Get the logical interfaces this device is assigned to.
 	 *
-	 * @returns {Array<LuCI.Network.Protocol>}
+	 * @returns {Array<LuCI.network.Protocol>}
 	 * Returns an array of `Network.Protocol` instances representing the
 	 * logical interfaces this device is assigned to.
 	 */
@@ -2982,7 +3211,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 			var networks = enumerateNetworks.apply(L.network);
 
 			for (var i = 0; i < networks.length; i++)
-				if (networks[i].containsDevice(this.ifname) || networks[i].getIfname() == this.ifname)
+				if (networks[i].containsDevice(this.device) || networks[i].getIfname() == this.device)
 					this.networks.push(networks[i]);
 
 			this.networks.sort(networkSort);
@@ -2994,19 +3223,35 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
 	/**
 	 * Get the related wireless network this device is related to.
 	 *
-	 * @returns {null|LuCI.Network.WifiNetwork}
+	 * @returns {null|LuCI.network.WifiNetwork}
 	 * Returns a `Network.WifiNetwork` instance representing the wireless
 	 * network corresponding to this network device or `null` if this device
 	 * is not a wireless device.
 	 */
 	getWifiNetwork: function() {
 		return (this.wif != null ? this.wif : null);
+	},
+
+	/**
+	 * Get the logical parent device of this device.
+	 *
+	 * In case of DSA switch ports, the parent device will be the DSA switch
+	 * device itself, for VLAN devices, the parent refers to the base device
+	 * etc.
+	 *
+	 * @returns {null|LuCI.network.Device}
+	 * Returns a `Network.Device` instance representing the parent device or
+	 * `null` when this device has no parent, as it is the case for e.g.
+	 * ordinary ethernet interfaces.
+	 */
+	getParent: function() {
+		return this.dev.parent ? Network.prototype.instantiateDevice(this.dev.parent) : null;
 	}
 });
 
 /**
  * @class
- * @memberof LuCI.Network
+ * @memberof LuCI.network
  * @hideconstructor
  * @classdesc
  *
@@ -3014,7 +3259,7 @@ Device = L.Class.extend(/** @lends LuCI.Network.Device.prototype */ {
  * present on the system and provides wireless capability information as
  * well as methods for enumerating related wireless networks.
  */
-WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
+WifiDevice = baseclass.extend(/** @lends LuCI.network.WifiDevice.prototype */ {
 	__init__: function(name, radiostate) {
 		var uciWifiDevice = uci.get('wireless', name);
 
@@ -3110,6 +3355,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 *  - `g` - Legacy 802.11g mode, 2.4 GHz, up to 54 Mbit/s
 	 *  - `n` - IEEE 802.11n mode, 2.4 or 5 GHz, up to 600 Mbit/s
 	 *  - `ac` - IEEE 802.11ac mode, 5 GHz, up to 6770 Mbit/s
+	 *  - `ax` - IEEE 802.11ax mode, 2.4 or 5 GHz
 	 */
 	getHWModes: function() {
 		var hwmodes = this.ubus('dev', 'iwinfo', 'hwmodes');
@@ -3131,6 +3377,10 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 *  - `VHT40` - applicable to IEEE 802.11ac, 40 MHz wide channels
 	 *  - `VHT80` - applicable to IEEE 802.11ac, 80 MHz wide channels
 	 *  - `VHT160` - applicable to IEEE 802.11ac, 160 MHz wide channels
+	 *  - `HE20` - applicable to IEEE 802.11ax, 20 MHz wide channels
+	 *  - `HE40` - applicable to IEEE 802.11ax, 40 MHz wide channels
+	 *  - `HE80` - applicable to IEEE 802.11ax, 80 MHz wide channels
+	 *  - `HE160` - applicable to IEEE 802.11ax, 160 MHz wide channels
 	 */
 	getHTModes: function() {
 		var htmodes = this.ubus('dev', 'iwinfo', 'htmodes');
@@ -3154,7 +3404,10 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 		    modestr = '';
 
 		hwmodes.sort(function(a, b) {
-			return (a.length != b.length ? a.length > b.length : a > b);
+			if (a.length != b.length)
+				return a.length - b.length;
+
+			return strcmp(a, b);
 		});
 
 		modestr = hwmodes.join('');
@@ -3166,8 +3419,8 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 * A wireless scan result object describes a neighbouring wireless
 	 * network found in the vincinity.
 	 *
-	 * @typedef {Object<string, number|string|LuCI.Network.WifiEncryption>} WifiScanResult
-	 * @memberof LuCI.Network
+	 * @typedef {Object<string, number|string|LuCI.network.WifiEncryption>} WifiScanResult
+	 * @memberof LuCI.network
 	 *
 	 * @property {string} ssid
 	 * The SSID / Mesh ID of the network.
@@ -3192,7 +3445,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 * The maximum possible quality level of the signal, can be used in
 	 * conjunction with `quality` to calculate a quality percentage.
 	 *
-	 * @property {LuCI.Network.WifiEncryption} encryption
+	 * @property {LuCI.network.WifiEncryption} encryption
 	 * The encryption used by the wireless network.
 	 */
 
@@ -3200,7 +3453,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 * Trigger a wireless scan on this radio device and obtain a list of
 	 * nearby networks.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.WifiScanResult>>}
+	 * @returns {Promise<Array<LuCI.network.WifiScanResult>>}
 	 * Returns a promise resolving to an array of scan result objects
 	 * describing the networks found in the vincinity.
 	 */
@@ -3231,14 +3484,14 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 * or a Linux network device name like `wlan0` which is resolved to the
 	 * corresponding configuration section through `ubus` runtime information.
 	 *
-	 * @returns {Promise<LuCI.Network.WifiNetwork>}
+	 * @returns {Promise<LuCI.network.WifiNetwork>}
 	 * Returns a promise resolving to a `Network.WifiNetwork` instance
 	 * representing the wireless network and rejecting with `null` if
 	 * the given network could not be found or is not associated with
 	 * this radio device.
 	 */
 	getWifiNetwork: function(network) {
-		return L.network.getWifiNetwork(network).then(L.bind(function(networkInstance) {
+		return Network.prototype.getWifiNetwork(network).then(L.bind(function(networkInstance) {
 			var uciWifiIface = (networkInstance.sid ? uci.get('wireless', networkInstance.sid) : null);
 
 			if (uciWifiIface == null || uciWifiIface['.type'] != 'wifi-iface' || uciWifiIface.device != this.sid)
@@ -3251,13 +3504,13 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	/**
 	 * Get all wireless networks associated with this wireless radio device.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.WifiNetwork>>}
+	 * @returns {Promise<Array<LuCI.network.WifiNetwork>>}
 	 * Returns a promise resolving to an array of `Network.WifiNetwork`
 	 * instances respresenting the wireless networks associated with this
 	 * radio device.
 	 */
 	getWifiNetworks: function() {
-		return L.network.getWifiNetworks().then(L.bind(function(networks) {
+		return Network.prototype.getWifiNetworks().then(L.bind(function(networks) {
 			var rv = [];
 
 			for (var i = 0; i < networks.length; i++)
@@ -3275,7 +3528,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 	 * @param {Object<string, string|string[]>} [options]
 	 * The options to set for the newly added wireless network.
 	 *
-	 * @returns {Promise<null|LuCI.Network.WifiNetwork>}
+	 * @returns {Promise<null|LuCI.network.WifiNetwork>}
 	 * Returns a promise resolving to a `WifiNetwork` instance describing
 	 * the newly added wireless network or `null` if the given options
 	 * were invalid.
@@ -3286,7 +3539,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 
 		options.device = this.sid;
 
-		return L.network.addWifiNetwork(options);
+		return Network.prototype.addWifiNetwork(options);
 	},
 
 	/**
@@ -3329,7 +3582,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
 
 /**
  * @class
- * @memberof LuCI.Network
+ * @memberof LuCI.network
  * @hideconstructor
  * @classdesc
  *
@@ -3338,7 +3591,7 @@ WifiDevice = L.Class.extend(/** @lends LuCI.Network.WifiDevice.prototype */ {
  * the runtime state of the network. Most radio devices support multiple
  * such networks in parallel.
  */
-WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
+WifiNetwork = baseclass.extend(/** @lends LuCI.network.WifiNetwork.prototype */ {
 	__init__: function(sid, radioname, radiostate, netid, netstate, hostapd) {
 		this.sid    = sid;
 		this.netid  = netid;
@@ -3508,6 +3761,24 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	},
 
 	/**
+	 * Get the Linux VLAN network device names.
+	 *
+	 * @returns {string[]}
+	 * Returns the current Linux VLAN network device name as resolved
+	 * from `ubus` runtime information or empty array if this network
+	 * has no associated VLAN network devices.
+	 */
+	getVlanIfnames: function() {
+		var vlans = L.toArray(this.ubus('net', 'vlans')),
+		    ifnames = [];
+
+		for (var i = 0; i < vlans.length; i++)
+			ifnames.push(vlans[i]['ifname']);
+
+		return ifnames;
+	},
+
+	/**
 	 * Get the name of the corresponding wifi radio device.
 	 *
 	 * @returns {null|string}
@@ -3521,7 +3792,7 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	/**
 	 * Get the corresponding wifi radio device.
 	 *
-	 * @returns {null|LuCI.Network.WifiDevice}
+	 * @returns {null|LuCI.network.WifiDevice}
 	 * Returns a `Network.WifiDevice` instance representing the corresponding
 	 * wifi radio device or `null` if the related radio device could not be
 	 * found.
@@ -3532,7 +3803,7 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 		if (radioname == null)
 			return Promise.reject();
 
-		return L.network.getWifiDevice(radioname);
+		return Network.prototype.getWifiDevice(radioname);
 	},
 
 	/**
@@ -3644,8 +3915,8 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	 * A wireless peer entry describes the properties of a remote wireless
 	 * peer associated with a local network.
 	 *
-	 * @typedef {Object<string, boolean|number|string|LuCI.Network.WifiRateEntry>} WifiPeerEntry
-	 * @memberof LuCI.Network
+	 * @typedef {Object<string, boolean|number|string|LuCI.network.WifiRateEntry>} WifiPeerEntry
+	 * @memberof LuCI.network
 	 *
 	 * @property {string} mac
 	 * The MAC address (BSSID).
@@ -3743,10 +4014,10 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	 *  - `DEEP SLEEP`
 	 *  - `UNKNOWN`
 	 *
-	 * @property {LuCI.Network.WifiRateEntry} rx
+	 * @property {LuCI.network.WifiRateEntry} rx
 	 * Describes the receiving wireless rate from the peer.
 	 *
-	 * @property {LuCI.Network.WifiRateEntry} tx
+	 * @property {LuCI.network.WifiRateEntry} tx
 	 * Describes the transmitting wireless rate to the peer.
 	 */
 
@@ -3755,7 +4026,7 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	 * transmission rate to or from a peer.
 	 *
 	 * @typedef {Object<string, boolean|number>} WifiRateEntry
-	 * @memberof LuCI.Network
+	 * @memberof LuCI.network
 	 *
 	 * @property {number} [drop_misc]
 	 * The amount of received misc. packages that have been dropped, e.g.
@@ -3807,17 +4078,36 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	 * @property {number} [nss]
 	 * Specifies the number of spatial streams used by the transmission.
 	 * Only applicable to VHT rates.
+	 *
+	 * @property {boolean} [he]
+	 * Specifies whether this rate is an HE (IEEE 802.11ax) rate.
+	 *
+	 * @property {number} [he_gi]
+	 * Specifies whether the guard interval used for the transmission.
+	 * Only applicable to HE rates.
+	 *
+	 * @property {number} [he_dcm]
+	 * Specifies whether dual concurrent modulation is used for the transmission.
+	 * Only applicable to HE rates.
 	 */
 
 	/**
 	 * Fetch the list of associated peers.
 	 *
-	 * @returns {Promise<Array<LuCI.Network.WifiPeerEntry>>}
+	 * @returns {Promise<Array<LuCI.network.WifiPeerEntry>>}
 	 * Returns a promise resolving to an array of wireless peers associated
 	 * with this network.
 	 */
 	getAssocList: function() {
-		return callIwinfoAssoclist(this.getIfname());
+		var tasks = [];
+		var ifnames = [ this.getIfname() ].concat(this.getVlanIfnames());
+
+		for (var i = 0; i < ifnames.length; i++)
+			tasks.push(callIwinfoAssoclist(ifnames[i]));
+
+		return Promise.all(tasks).then(function(values) {
+			return Array.prototype.concat.apply([], values);
+		});
 	},
 
 	/**
@@ -4000,7 +4290,7 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	/**
 	 * Get the primary logical interface this wireless network is attached to.
 	 *
-	 * @returns {null|LuCI.Network.Protocol}
+	 * @returns {null|LuCI.network.Protocol}
 	 * Returns a `Network.Protocol` instance representing the logical
 	 * interface or `null` if this network is not attached to any logical
 	 * interface.
@@ -4012,7 +4302,7 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	/**
 	 * Get the logical interfaces this wireless network is attached to.
 	 *
-	 * @returns {Array<LuCI.Network.Protocol>}
+	 * @returns {Array<LuCI.network.Protocol>}
 	 * Returns an array of `Network.Protocol` instances representing the
 	 * logical interfaces this wireless network is attached to.
 	 */
@@ -4026,7 +4316,7 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 			if (uciInterface == null || uciInterface['.type'] != 'interface')
 				continue;
 
-			networks.push(L.network.instantiateNetwork(networkNames[i]));
+			networks.push(Network.prototype.instantiateNetwork(networkNames[i]));
 		}
 
 		networks.sort(networkSort);
@@ -4037,12 +4327,12 @@ WifiNetwork = L.Class.extend(/** @lends LuCI.Network.WifiNetwork.prototype */ {
 	/**
 	 * Get the associated Linux network device.
 	 *
-	 * @returns {LuCI.Network.Device}
+	 * @returns {LuCI.network.Device}
 	 * Returns a `Network.Device` instance representing the Linux network
 	 * device associted with this wireless network.
 	 */
 	getDevice: function() {
-		return L.network.instantiateDevice(this.getIfname());
+		return Network.prototype.instantiateDevice(this.getIfname());
 	},
 
 	/**

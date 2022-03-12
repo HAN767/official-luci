@@ -1,6 +1,6 @@
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2019-11-20 17:08+0000\n"
+"PO-Revision-Date: 2021-05-10 09:32+0000\n"
 "Last-Translator: ssantos <ssantos@web.de>\n"
 "Language-Team: Portuguese <https://hosted.weblate.org/projects/openwrt/"
 "luciapplicationsmjpg-streamer/pt/>\n"
@@ -8,7 +8,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n > 1;\n"
-"X-Generator: Weblate 3.10-dev\n"
+"X-Generator: Weblate 4.7-dev\n"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:217
 msgid "Allow ringbuffer to exceed limit by this amount"
@@ -16,7 +16,7 @@ msgstr "Permitir que o buffer em anel exceda o limite por essa quantidade"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:95
 msgid "Ask for username and password on connect"
-msgstr "Pergunte por um usuário e palavra-passe na conexão"
+msgstr "Pergunte por um utilizador e palavra-passe na conexão"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:95
 msgid "Authentication required"
@@ -33,10 +33,6 @@ msgstr "Desativação automática do modo MJPEG"
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:82
 msgid "Blink"
 msgstr "Pisca"
-
-#: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:207
-msgid "Check to save the stream to an mjpeg file"
-msgstr "Marque para gravar o fluxo num ficheiro MJPEG"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:220
 msgid "Command to run"
@@ -55,7 +51,7 @@ msgid "Don't initialize dynctrls"
 msgstr "Não iniciar o dynctrls"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:74
-msgid "Drop frames smaller then this limit"
+msgid "Drop frames smaller than this limit"
 msgstr "Descarte quadros menores que este limite"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:12
@@ -76,15 +72,11 @@ msgstr "Ultrapassado"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:220
 msgid ""
-"Execute command after saving picture. Mjpg-streamer parse the filename as "
+"Execute command after saving picture. Mjpg-streamer parses the filename as "
 "first parameter to your script."
 msgstr ""
 "Execute o comando depois de gra\\var a imagem. Mjpg-streamer passa o nome do "
 "ficheiro como primeiro parâmetro para o comando."
-
-#: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:36
-msgid "File input"
-msgstr "Entrada do ficheiro"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:34
 msgid "File output"
@@ -105,6 +97,10 @@ msgstr "Quadros por segundos"
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:8
 msgid "General"
 msgstr "Geral"
+
+#: applications/luci-app-mjpg-streamer/root/usr/share/rpcd/acl.d/luci-app-mjpg-streamer.json:3
+msgid "Grant UCI access for luci-app-mjpg-streamer"
+msgstr "Conceder acesso UCI ao luci-app-mjpg-streamer"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:33
 msgid "HTTP output"
@@ -132,19 +128,16 @@ msgstr "Ligar a imagem mais nova ao nome fixo do ficheiro"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:222
 msgid "Link the last picture in ringbuffer to fixed named file provided."
-msgstr "Ligar a última imagem no ringbuffer ao ficheiro nomeado fixo fornecido."
+msgstr ""
+"Ligar a última imagem no ringbuffer ao ficheiro nomeado fixo fornecido."
 
-#: applications/luci-app-mjpg-streamer/luasrc/controller/mjpg-streamer.lua:12
+#: applications/luci-app-mjpg-streamer/root/usr/share/luci/menu.d/luci-app-mjpg-streamer.json:3
 msgid "MJPG-streamer"
 msgstr "MJPG-streamer"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:213
 msgid "Max. number of pictures to hold"
 msgstr "Número máximo de imagens a serem mantidas"
-
-#: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:207
-msgid "Mjpeg output"
-msgstr "Saída Mjpeg"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:81
 msgid "Off"
@@ -199,7 +192,7 @@ msgid ""
 "Set the quality in percent. This setting activates YUYV format, disables "
 "MJPEG"
 msgstr ""
-"Defina a qualidade em porcentagem. Esta definição ativa o formato YUYV, "
+"Defina a qualidade em percentagem. Esta definição ativa o formato YUYV, "
 "desativa MJPEG"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:91
@@ -224,3 +217,12 @@ msgid ""
 msgstr ""
 "Mjpg streamer é uma aplicação de streaming para webcams compatíveis com o "
 "Linux-UVC"
+
+#~ msgid "Check to save the stream to an mjpeg file"
+#~ msgstr "Marque para gravar o fluxo num ficheiro MJPEG"
+
+#~ msgid "File input"
+#~ msgstr "Entrada do ficheiro"
+
+#~ msgid "Mjpeg output"
+#~ msgstr "Saída Mjpeg"

@@ -1,18 +1,18 @@
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2019-10-17 20:23+0000\n"
-"Last-Translator: Mattias Münster <mattiasmun@gmail.com>\n"
+"PO-Revision-Date: 2021-12-14 02:53+0000\n"
+"Last-Translator: Kristoffer Grundström <swedishsailfishosuser@tutanota.com>\n"
 "Language-Team: Swedish <https://hosted.weblate.org/projects/openwrt/"
 "luciapplicationsudpxy/sv/>\n"
 "Language: sv\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 3.9.1-dev\n"
+"X-Generator: Weblate 4.10-dev\n"
 
 #: applications/luci-app-udpxy/luasrc/model/cbi/udpxy.lua:23
 msgid "Bind IP/Interface"
-msgstr ""
+msgstr "Bind IP/Gränssnitt"
 
 #: applications/luci-app-udpxy/luasrc/model/cbi/udpxy.lua:47
 msgid "Buffer messages"
@@ -29,6 +29,10 @@ msgstr ""
 #: applications/luci-app-udpxy/luasrc/model/cbi/udpxy.lua:10
 msgid "Enabled"
 msgstr "Aktiverad"
+
+#: applications/luci-app-udpxy/root/usr/share/rpcd/acl.d/luci-app-udpxy.json:3
+msgid "Grant UCI access for luci-app-udpxy"
+msgstr ""
 
 #: applications/luci-app-udpxy/luasrc/model/cbi/udpxy.lua:39
 msgid "Log file"
@@ -52,7 +56,7 @@ msgstr "Port"
 
 #: applications/luci-app-udpxy/luasrc/model/cbi/udpxy.lua:15
 msgid "Respawn"
-msgstr ""
+msgstr "Återuppliva"
 
 #: applications/luci-app-udpxy/luasrc/model/cbi/udpxy.lua:31
 msgid "Source IP/Interface"
@@ -66,7 +70,7 @@ msgstr "Status"
 msgid "Verbose"
 msgstr ""
 
-#: applications/luci-app-udpxy/luasrc/controller/udpxy.lua:11
+#: applications/luci-app-udpxy/root/usr/share/luci/menu.d/luci-app-udpxy.json:3
 msgid "udpxy"
 msgstr ""
 

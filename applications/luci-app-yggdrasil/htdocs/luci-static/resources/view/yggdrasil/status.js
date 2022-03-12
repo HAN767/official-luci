@@ -1,4 +1,5 @@
 'use strict';
+'require view';
 'require fs';
 'require form';
 
@@ -10,7 +11,7 @@ function init_view() {
 		"IPv6 address": "self-address",
 		"IPv6 subnet": "self-subnet",
 		"Coords": "self-coords",
-		"Public key": "self-boxpubkey",
+		"Public key": "self-key",
 		"Build name": "self-buildname",
 		"Build version": "self-version"
 	};
@@ -36,7 +37,7 @@ function init_view() {
 	peerings.setAttribute("class", "table"); peerings.id = "yggdrasil-peerings";
 	var tr = document.createElement("tr");
 	tr.setAttribute("class", "tr table-titles");
-	["Endpoint", "Address", "Proto", "Uptime", "Received", "Transmitted"].forEach(function(t) {
+	["Endpoint", "Address", "Coords", "Key", "Port"].forEach(function(t) {
 		var th = document.createElement("th"); th.setAttribute("class", "th nowrap left");
 		th.innerText = t;
 		tr.appendChild(th);
@@ -54,18 +55,19 @@ function update_active_peers() {
 			while (table.rows.length > 1) { table.deleteRow(1); }
 			Object.keys(peers).forEach(function(address) {
 				var row = table.insertRow(-1);
-				row.insertCell(-1).textContent = peers[address].endpoint;
+				row.style.fontSize = "xx-small";
+				row.insertCell(-1).textContent = peers[address].remote;
 				row.insertCell(-1).textContent = address;
-				row.insertCell(-1).textContent = peers[address].proto;
-				row.insertCell(-1).textContent = '%t'.format(peers[address].uptime);
-				row.insertCell(-1).textContent = '%1024.2mB'.format(peers[address].bytes_recvd);
-				row.insertCell(-1).textContent = '%1024.2mB'.format(peers[address].bytes_sent);
+				row.insertCell(-1).textContent = "[" + peers[address].coords.toString() + "]";
+				row.insertCell(-1).textContent = peers[address].key;
+				row.insertCell(-1).textContent = peers[address].port;
 			});
 		}
+		setTimeout(update_active_peers, 5000);
 	});
 }
 
-return L.view.extend({
+return view.extend({
 	load: function() {
 		return Promise.all([
 			L.resolveDefault(fs.stat("/usr/sbin/yggdrasilctl"), null),
@@ -84,23 +86,12 @@ return L.view.extend({
 			var r = obj[address];
 			view.querySelector('#self-address').innerText = address;
 			view.querySelector('#self-subnet').innerText = r.subnet;
-			view.querySelector('#self-coords').innerText = r.coords;
-			view.querySelector('#self-boxpubkey').innerText = r.box_pub_key;
+			view.querySelector('#self-coords').innerText = "[" + r.coords + "]";
+			view.querySelector('#self-key').innerText = r.key;
 			view.querySelector('#self-buildname').innerText = r.build_name;
 			view.querySelector('#self-version').innerText = r.build_version;
 
-			var table = view.querySelector('#yggdrasil-peerings');
-			Object.keys(peers).forEach(function(address) {
-				var row = table.insertRow(-1);
-				row.insertCell(-1).textContent = peers[address].endpoint;
-				row.insertCell(-1).textContent = address;
-				row.insertCell(-1).textContent = peers[address].proto;
-				row.insertCell(-1).textContent = '%t'.format(peers[address].uptime);
-				row.insertCell(-1).textContent = '%1024.2mB'.format(peers[address].bytes_recvd);
-				row.insertCell(-1).textContent = '%1024.2mB'.format(peers[address].bytes_sent);
-
-			});
-			setInterval(update_active_peers, 5000);
+			update_active_peers();
 		} else {
 			view.innerHTML = "<h2>Yggdrasil is not running</h2>";
 		}

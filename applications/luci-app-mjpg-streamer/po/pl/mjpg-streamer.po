@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2019-12-01 15:35+0000\n"
-"Last-Translator: Marcin Net <marcin.net@linux.pl>\n"
+"PO-Revision-Date: 2021-05-03 15:24+0000\n"
+"Last-Translator: Matthaiks <kitynska@gmail.com>\n"
 "Language-Team: Polish <https://hosted.weblate.org/projects/openwrt/"
 "luciapplicationsmjpg-streamer/pl/>\n"
 "Language: pl\n"
@@ -9,11 +9,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
 "|| n%100>=20) ? 1 : 2;\n"
-"X-Generator: Weblate 3.10-dev\n"
+"X-Generator: Weblate 4.7-dev\n"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:217
 msgid "Allow ringbuffer to exceed limit by this amount"
-msgstr "Pozwól, aby bufor pierścieniowy przekroczył limit o tą ilość"
+msgstr "Zezwól, aby bufor pierścieniowy przekroczył limit o tę ilość"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:95
 msgid "Ask for username and password on connect"
@@ -35,10 +35,6 @@ msgstr "Automatyczne wyłączanie trybu MJPEG"
 msgid "Blink"
 msgstr "Migacz"
 
-#: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:207
-msgid "Check to save the stream to an mjpeg file"
-msgstr "Zaznacz aby zapisywać strumień do pliku mjpeg"
-
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:220
 msgid "Command to run"
 msgstr "Polecenie do uruchomienia"
@@ -56,7 +52,7 @@ msgid "Don't initialize dynctrls"
 msgstr "Nie ładuj dynamicznych kontroli"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:74
-msgid "Drop frames smaller then this limit"
+msgid "Drop frames smaller than this limit"
 msgstr "Porzucaj klatki mniejsze niż ten limit"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:12
@@ -77,15 +73,11 @@ msgstr "Przekraczać"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:220
 msgid ""
-"Execute command after saving picture. Mjpg-streamer parse the filename as "
+"Execute command after saving picture. Mjpg-streamer parses the filename as "
 "first parameter to your script."
 msgstr ""
 "Wykonaj komendę po wykonaniu zdjęcia. Mjpg-streamer analizuje nazwę pliku "
 "jako pierwszy parametr do twojego skryptu."
-
-#: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:36
-msgid "File input"
-msgstr "Plik wejściowy"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:34
 msgid "File output"
@@ -107,13 +99,17 @@ msgstr "Klatki na sekundę"
 msgid "General"
 msgstr "Ogólne"
 
+#: applications/luci-app-mjpg-streamer/root/usr/share/rpcd/acl.d/luci-app-mjpg-streamer.json:3
+msgid "Grant UCI access for luci-app-mjpg-streamer"
+msgstr "Udziel dostępu UCI do luci-app-mjpg-streamer"
+
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:33
 msgid "HTTP output"
 msgstr "Wyjście HTTP"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:14
 msgid "Input plugin"
-msgstr "Wtyczka wejścią"
+msgstr "Wtyczka wejściowa"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:209
 msgid "Interval between saving pictures"
@@ -137,17 +133,13 @@ msgstr ""
 "Połącz ostatnie zdjęcie w buforze pierścieniowym z dostarczonym z ustaloną "
 "nazwą plikiem."
 
-#: applications/luci-app-mjpg-streamer/luasrc/controller/mjpg-streamer.lua:12
+#: applications/luci-app-mjpg-streamer/root/usr/share/luci/menu.d/luci-app-mjpg-streamer.json:3
 msgid "MJPG-streamer"
 msgstr "MJPG-Streamer"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:213
 msgid "Max. number of pictures to hold"
 msgstr "Maksymalna liczba zdjęć do przechowywania"
-
-#: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:207
-msgid "Mjpeg output"
-msgstr "Wyjście mjpeg"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:81
 msgid "Off"
@@ -159,7 +151,7 @@ msgstr "Włączone"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:20
 msgid "Output plugin"
-msgstr "Wyjściowa wtyczka"
+msgstr "Wtyczka wyjściowa"
 
 #: applications/luci-app-mjpg-streamer/luasrc/model/cbi/mjpg-streamer.lua:102
 msgid "Password"
@@ -226,3 +218,12 @@ msgid ""
 msgstr ""
 "mjpg streamer jest aplikacją do strumieniowania dla kamer zgodnych z UVC i "
 "Linuxem"
+
+#~ msgid "Check to save the stream to an mjpeg file"
+#~ msgstr "Zaznacz aby zapisywać strumień do pliku mjpeg"
+
+#~ msgid "File input"
+#~ msgstr "Plik wejściowy"
+
+#~ msgid "Mjpeg output"
+#~ msgstr "Wyjście mjpeg"

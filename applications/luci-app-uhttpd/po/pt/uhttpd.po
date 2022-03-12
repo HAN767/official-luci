@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"PO-Revision-Date: 2019-11-20 17:05+0000\n"
+"PO-Revision-Date: 2022-02-07 22:09+0000\n"
 "Last-Translator: ssantos <ssantos@web.de>\n"
 "Language-Team: Portuguese <https://hosted.weblate.org/projects/openwrt/"
 "luciapplicationsuhttpd/pt/>\n"
@@ -10,7 +10,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n > 1;\n"
-"X-Generator: Weblate 3.10-dev\n"
+"X-Generator: Weblate 4.11-dev\n"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:135
 msgid ""
@@ -51,7 +51,7 @@ msgstr "Interpretador de tipo de ficheiro CGI"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:153
 msgid "CGI is disabled if not present."
-msgstr "O CGI estará desabilitado se não presente."
+msgstr "O CGI estará desativado se não presente."
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:142
 msgid "Config file (e.g. for credentials for Basic Auth)"
@@ -61,13 +61,13 @@ msgstr "Ficheiro de configuração (ex: credenciais para autenticação básica)
 msgid "Connection reuse"
 msgstr "Reutilizar conexão"
 
-#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:221
+#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:229
 msgid "Country"
 msgstr "País"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:173
 msgid "Disable JSON-RPC authorization via ubus session API"
-msgstr "Desabilita a autorização JSON-RPC através da API de sessão ubus"
+msgstr "Desativa a autorização JSON-RPC através da API de sessão ubus"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:129
 msgid "Do not follow symlinks outside document root"
@@ -87,7 +87,7 @@ msgstr "Ex: use index.html e index.php quando usar PHP"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:160
 msgid "Embedded Lua interpreter is disabled if not present."
-msgstr "O interpretador Lua embutido será desabilitado se não presente."
+msgstr "O interpretador Lua embutido será desativado se não presente."
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:169
 msgid "Enable JSON-RPC Cross-Origin Resource Support"
@@ -107,23 +107,31 @@ msgstr "Caminho completo para o interpretador de scripts Lua"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:18
 msgid "General Settings"
-msgstr "Configurações Gerais"
+msgstr "Configurações gerais"
+
+#: applications/luci-app-uhttpd/root/usr/share/rpcd/acl.d/luci-app-uhttpd.json:3
+msgid "Grant UCI access for luci-app-uhttpd"
+msgstr "Conceder acesso UCI ao luci-app-uhttpd"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:22
 msgid "HTTP listeners (address:port)"
 msgstr "Escutas do HTTP (endereço:porta)"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:94
-msgid "HTTPS Certificate (DER Encoded)"
-msgstr "Certificado do HTTPS (codificado em formato PEM)"
+msgid "HTTPS Certificate (DER or PEM format)"
+msgstr "Certificado HTTPS (formato DER ou PEM)"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:96
-msgid "HTTPS Private Key (DER Encoded)"
-msgstr "Chave Privada do HTTPS (codificado como DER)"
+msgid "HTTPS Private Key (DER or PEM format)"
+msgstr "Chave privada de HTTPS (formato DER ou PEM)"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:50
 msgid "HTTPS listener (address:port)"
 msgstr "Escuta do HTTPS (endereço:porta)"
+
+#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:221
+msgid "If empty, a random/unique value is used in cert generation"
+msgstr "Se estiver vazio, um valor aleatório/único é usado na geração do cert"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:90
 msgid "Ignore private IPs on public interface"
@@ -138,14 +146,14 @@ msgid ""
 "Interpreter to associate with file endings ('suffix=handler', e.g. '.php=/"
 "usr/bin/php-cgi')"
 msgstr ""
-"Interpretador para associar com extensões de ficheiros ('extensão="
-"interpretador', ex: '.php=/usr/bin/php-cgi')"
+"Interpretador para associar com extensões de ficheiros "
+"('extensão=interpretador', ex: '.php=/usr/bin/php-cgi')"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:214
 msgid "Length of key in bits"
 msgstr "Comprimento da chave em bits"
 
-#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:227
+#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:223
 msgid "Location"
 msgstr "Localização"
 
@@ -164,6 +172,10 @@ msgstr "Tempo máximo de espera para execuções de Lua, CGI ou ubus"
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:182
 msgid "Maximum wait time for network activity"
 msgstr "Tempo máximo de espera para atividade na rede"
+
+#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:221
+msgid "Organization"
+msgstr "Organização"
 
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:166
 msgid "Override path for ubus socket"
@@ -206,7 +218,7 @@ msgid ""
 "Settings which are either rarely needed or which affect serving the WebUI"
 msgstr "Ajustes que são raramente usadas ou que afetam a interface web"
 
-#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:224
+#: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:226
 msgid "State"
 msgstr "Estado"
 
@@ -246,8 +258,8 @@ msgstr "Não usar autenticação HTTP se não presente"
 msgid "a.k.a CommonName"
 msgstr "também conhecido como Nome Comum"
 
-#: applications/luci-app-uhttpd/luasrc/controller/uhttpd/uhttpd.lua:13
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:6
+#: applications/luci-app-uhttpd/root/usr/share/luci/menu.d/luci-app-uhttpd.json:3
 msgid "uHTTPd"
 msgstr "uHTTPd"
 
@@ -266,3 +278,9 @@ msgstr ""
 #: applications/luci-app-uhttpd/luasrc/model/cbi/uhttpd/uhttpd.lua:163
 msgid "ubus integration is disabled if not present"
 msgstr "A integração com o ubus será desativada se não presente"
+
+#~ msgid "HTTPS Certificate (DER Encoded)"
+#~ msgstr "Certificado do HTTPS (codificado em formato PEM)"
+
+#~ msgid "HTTPS Private Key (DER Encoded)"
+#~ msgstr "Chave Privada do HTTPS (codificado como DER)"

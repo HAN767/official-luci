@@ -1,18 +1,18 @@
 msgid ""
 msgstr ""
-"PO-Revision-Date: 2019-11-25 13:57+0000\n"
-"Last-Translator: Ansuel Smith <ansuelsmth@gmail.com>\n"
+"PO-Revision-Date: 2021-09-08 07:33+0000\n"
+"Last-Translator: pisquan8 <cimurro@outlook.de>\n"
 "Language-Team: Italian <https://hosted.weblate.org/projects/openwrt/"
 "luciapplicationsdynapoint/it/>\n"
 "Language: it\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Generator: Weblate 3.10-dev\n"
+"X-Generator: Weblate 4.8.1-dev\n"
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:90
 msgid "Activate this wVIF if status is:"
-msgstr ""
+msgstr "Attiva questo wVIF se lo stato è:"
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:31
 msgid "Append hostname to ssid"
@@ -36,14 +36,14 @@ msgstr ""
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:71
 msgid "Device"
-msgstr ""
+msgstr "Dispositivo"
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:66
 #: applications/luci-app-dynapoint/luasrc/view/dynapoint/cbi_color.htm:5
 msgid "Disabled"
 msgstr "Disabilitato"
 
-#: applications/luci-app-dynapoint/luasrc/controller/dynapoint.lua:7
+#: applications/luci-app-dynapoint/root/usr/share/luci/menu.d/luci-app-dynapoint.json:3
 msgid "DynaPoint"
 msgstr ""
 
@@ -61,6 +61,10 @@ msgid ""
 "considered as offline"
 msgstr ""
 
+#: applications/luci-app-dynapoint/root/usr/share/rpcd/acl.d/luci-app-dynapoint.json:3
+msgid "Grant UCI access for luci-app-dynapoint"
+msgstr ""
+
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:56
 msgid "List of Wireless Virtual Interfaces (wVIF)"
 msgstr ""
@@ -76,7 +80,7 @@ msgstr ""
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:85
 msgid "Mode"
-msgstr ""
+msgstr "Modalità"
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:94
 msgid "Not used by DynaPoint"
@@ -92,7 +96,7 @@ msgstr ""
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:87
 msgid "SSID"
-msgstr ""
+msgstr "SSID"
 
 #: applications/luci-app-dynapoint/luasrc/model/cbi/dynapoint.lua:47
 msgid "Software Section"

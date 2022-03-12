@@ -1,4 +1,6 @@
 'use strict';
+'require view';
+'require poll';
 'require ui';
 'require uci';
 'require rpc';
@@ -27,9 +29,9 @@ callInitAction = rpc.declare({
 });
 
 callGetLocaltime = rpc.declare({
-	object: 'luci',
-	method: 'getLocaltime',
-	expect: { result: 0 }
+	object: 'system',
+	method: 'info',
+	expect: { localtime: 0 }
 });
 
 callSetLocaltime = rpc.declare({
@@ -45,36 +47,51 @@ callTimezone = rpc.declare({
 	expect: { '': {} }
 });
 
+function formatTime(epoch) {
+	var date = new Date(epoch * 1000);
+
+	return '%04d-%02d-%02d %02d:%02d:%02d'.format(
+		date.getUTCFullYear(),
+		date.getUTCMonth() + 1,
+		date.getUTCDate(),
+		date.getUTCHours(),
+		date.getUTCMinutes(),
+		date.getUTCSeconds()
+	);
+}
+
 CBILocalTime = form.DummyValue.extend({
 	renderWidget: function(section_id, option_id, cfgvalue) {
 		return E([], [
-			E('span', {}, [
-				E('input', {
-					'id': 'localtime',
-					'type': 'text',
-					'readonly': true,
-					'value': new Date(cfgvalue * 1000).toLocaleString()
-				})
-			]),
-			' ',
-			E('button', {
-				'class': 'cbi-button cbi-button-apply',
-				'click': ui.createHandlerFn(this, function() {
-					return callSetLocaltime(Math.floor(Date.now() / 1000));
-				})
-			}, _('Sync with browser')),
-			' ',
-			this.ntpd_support ? E('button', {
-				'class': 'cbi-button cbi-button-apply',
-				'click': ui.createHandlerFn(this, function() {
-					return callInitAction('sysntpd', 'restart');
-				})
-			}, _('Sync with NTP-Server')) : ''
+			E('input', {
+				'id': 'localtime',
+				'type': 'text',
+				'readonly': true,
+				'value': formatTime(cfgvalue)
+			}),
+			E('br'),
+			E('span', { 'class': 'control-group' }, [
+				E('button', {
+					'class': 'cbi-button cbi-button-apply',
+					'click': ui.createHandlerFn(this, function() {
+						return callSetLocaltime(Math.floor(Date.now() / 1000));
+					}),
+					'disabled': (this.readonly != null) ? this.readonly : this.map.readonly
+				}, _('Sync with browser')),
+				' ',
+				this.ntpd_support ? E('button', {
+					'class': 'cbi-button cbi-button-apply',
+					'click': ui.createHandlerFn(this, function() {
+						return callInitAction('sysntpd', 'restart');
+					}),
+					'disabled': (this.readonly != null) ? this.readonly : this.map.readonly
+				}, _('Sync with NTP-Server')) : ''
+			])
 		]);
 	},
 });
 
-return L.view.extend({
+return view.extend({
 	load: function() {
 		return Promise.all([
 			callInitList('sysntpd'),
@@ -116,6 +133,13 @@ return L.view.extend({
 
 		o = s.taboption('general', form.Value, 'hostname', _('Hostname'));
 		o.datatype = 'hostname';
+
+		/* could be used also as a default for LLDP, SNMP "system description" in the future */
+		o = s.taboption('general', form.Value, 'description', _('Description'), _('An optional, short description for this device'));
+		o.optional = true;
+
+		o = s.taboption('general', form.TextValue, 'notes', _('Notes'), _('Optional, free-form notes about this device'));
+		o.optional = true;
 
 		o = s.taboption('general', form.ListValue, 'zonename', _('Timezone'));
 		o.value('UTC');
@@ -187,15 +211,10 @@ return L.view.extend({
 
 			o = s.taboption('zram', form.ListValue, 'zram_comp_algo', _('ZRam Compression Algorithm'));
 			o.optional    = true;
-			o.placeholder = 'lzo';
+			o.default     = 'lzo';
 			o.value('lzo', 'lzo');
 			o.value('lz4', 'lz4');
-			o.value('deflate', 'deflate');
-
-			o = s.taboption('zram', form.Value, 'zram_comp_streams', _('ZRam Compression Streams'), _('Number of parallel threads used for compression'));
-			o.optional    = true;
-			o.placeholder = 1;
-			o.datatype    = 'uinteger';
+			o.value('zstd', 'zstd');
 		}
 
 		/*
@@ -277,9 +296,9 @@ return L.view.extend({
 		}
 
 		return m.render().then(function(mapEl) {
-			L.Poll.add(function() {
+			poll.add(function() {
 				return callGetLocaltime().then(function(t) {
-					mapEl.querySelector('#localtime').value = new Date(t * 1000).toLocaleString();
+					mapEl.querySelector('#localtime').value = formatTime(t);
 				});
 			});
 
