@@ -76,7 +76,8 @@
 	background: inherit;
 }
 
-.td[width="33%"] {
+.td[width="33%"], 
+.td[width="33%"]~.td {
 	padding: 1.1em;
 }
 
@@ -623,8 +624,8 @@ body[class*="node-"] > .main > .main-left > .nav > .slide > .menu.active::before
 .main > .main-left > .nav > li:last-child::before {
 	position: absolute;
 	left: 14px;
-	width: 20px;
-	height: 20px;
+	width: 24px;
+	height: 24px;
 	content: url(./icons/logout.svg);
 }
 
@@ -2340,6 +2341,12 @@ input[name="nslookup"] {
 	margin-bottom: .2rem;
 }
 
+.control-group {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+}
+
 [data-page="admin-system-opkg"] div.btn {
 	line-height: 3;
 	display: inline;
@@ -2649,7 +2656,7 @@ input[name="nslookup"] {
 	.main > .main-left > .nav > li,
 	.main > .main-left > .nav > li a,
 	.main > .main-left > .nav > .slide > .menu,
-	.main > .main-left > .nav > li > [data-title="Logout"] {
+	.main > .main-left > .nav > li:last-child > [data-title] {
 		font-size: .9rem;
 	}
 
