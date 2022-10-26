@@ -346,11 +346,11 @@ function invoke_form_action(model, ...)
 	end
 
 	http:header("X-CBI-State", state or 0)
-	tpl.render("header")
+	_G.L.include("header")
 	for i, res in ipairs(maps) do
 		res:render()
 	end
-	tpl.render("footer")
+	_G.L.include("footer")
 end
 
 
@@ -392,7 +392,7 @@ function cbi(model, config)
 		["type"] = "call",
 		["module"] = "luci.dispatcher",
 		["function"] = "invoke_cbi_action",
-		["parameters"] = { model, config },
+		["parameters"] = { model, config or {} },
 		["post"] = {
 			["cbi.submit"] = true
 		}
